@@ -1,0 +1,30 @@
+# Segredos (o .env.example sem senhas reais pode ir para o Git)
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node / frontend
+node_modules/
+dist/
+
+# Fotos enviadas pelos usuários (ajuste o caminho se o armazenamento mudar)
+backend/storage/
+uploads/
+
+# Sistema e editor
+Thumbs.db
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+
+# Configurações locais do Claude Code
+.claude/settings.local.json
