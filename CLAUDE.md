@@ -40,23 +40,43 @@ Projeto de TCC da Paula: aplicação para cada usuário acompanhar seus veículo
 - Não exiba na conversa o conteúdo de arquivos `.env`. Para criar um `.env`, copie o `.env.example` (sem segredos reais) e peça para a Paula preencher as senhas.
 - Não faça `git commit`, `git push` nem apague arquivos fora do escopo da etapa sem a Paula autorizar. Ao fim de cada etapa, sugira a mensagem de commit.
 
-## Estrutura planejada (confirmar na etapa 1)
+## Estrutura (confirmada na etapa 1)
 
 ```
 meu-veiculo/
 ├── CLAUDE.md
 ├── README.md                 # guia completo, atualizado a cada etapa
-├── backend/                  # API, migrations, testes
-├── frontend/                 # interface
+├── backend/
+│   ├── gerenciar.py          # comandos do banco (criar-bancos, estado, migrar, adotar, backup)
+│   ├── migrations/versions/  # Alembic; 0001 = SQL original (conferido por SHA-256)
+│   ├── tests/                # pytest no PostgreSQL de teste
+│   └── app/
+│       ├── main.py, config.py, dependencias.py
+│       ├── routes/  controllers/  services/  repositories/
+│       ├── entities/  schemas/  banco/
+├── frontend/src/             # pages, components, services, types, utils, styles, tests
 ├── database/original/        # SQL recebido (somente leitura)
 └── docs/                     # requisitos, telas, progresso, decisões
 ```
 
+## Arquitetura do backend (obrigatória)
+
+Fluxo: Route → Controller → Service → Repository → `banco/` → PostgreSQL. Detalhes e roteiro para endpoints novos no README (seção 3).
+
+- routes: só endpoints; controllers: requisição/resposta HTTP e tradução de erros; services: regras e transações (`UnidadeDeTrabalho`), sem FastAPI nem SQLAlchemy; repositories: todo o SQL; entities: classes SQLAlchemy das tabelas existentes (nunca `create_all`); schemas: JSON de entrada/saída (Pydantic); banco: conexão, sessão, migrations, backup.
+- `tests/test_arquitetura.py` impede imports que furem as camadas; `tests/test_entities.py` confere entities com o banco.
+- Frontend segue organização React (pages, components, services, types), não as camadas do backend.
+
 ## Comandos do projeto
 
-Mantenha esta seção atualizada assim que cada comando existir (PowerShell, com a pasta de execução).
+PowerShell. No PowerShell, o `npm` exige `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` (ou use `npm.cmd`).
 
-- Iniciar backend: (definir na etapa 1)
-- Iniciar frontend: (definir na etapa 1)
-- Aplicar migrations: (definir na etapa 1)
-- Rodar testes: (definir na etapa 1)
+- Preparar backend (pasta `backend`): `python -m venv .venv` e `.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt`
+- Criar usuário e bancos (pasta `backend`, pede a senha do postgres): `.\.venv\Scripts\python.exe gerenciar.py criar-bancos`
+- Estado / aplicar migrations (pasta `backend`): `.\.venv\Scripts\python.exe gerenciar.py estado` / `... gerenciar.py migrar` (`--teste` para o banco de teste)
+- Banco já existente criado com o SQL original (pasta `backend`): `... gerenciar.py backup` e `... gerenciar.py adotar-banco-existente`
+- Iniciar backend (pasta `backend`): `.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload` → http://127.0.0.1:8000/docs
+- Preparar frontend (pasta `frontend`): `npm ci`
+- Iniciar frontend (pasta `frontend`): `npm run dev` → http://localhost:5173
+- Testes backend (pasta `backend`): `.\.venv\Scripts\python.exe -m pytest`
+- Testes frontend (pasta `frontend`): `npm test` e `npm run typecheck`

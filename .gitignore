@@ -12,9 +12,13 @@ venv/
 .coverage
 htmlcov/
 
+# Backups do banco (contêm dados reais)
+backend/backups/
+
 # Node / frontend
 node_modules/
 dist/
+*.tsbuildinfo
 
 # Fotos enviadas pelos usuários (ajuste o caminho se o armazenamento mudar)
 backend/storage/
