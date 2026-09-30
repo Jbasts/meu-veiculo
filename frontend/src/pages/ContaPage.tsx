@@ -63,7 +63,7 @@ export default function ContaPage() {
   return (
     <div className="pagina">
       <main className="conteudo conteudo--topo">
-        <TopoComVoltar titulo="Conta e senha" voltarPara="/" />
+        <TopoComVoltar titulo="Conta e senha" voltarPara="/mais" />
 
         <section className="cartao cartao--perfil">
           <AvatarInicial nome={usuario.nome} />

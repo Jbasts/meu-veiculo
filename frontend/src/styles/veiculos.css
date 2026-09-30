@@ -1,0 +1,745 @@
+/* Barra de navegação inferior, veículos, quilometragem e fotos (etapa 3).
+   As cores e medidas vêm das variáveis de tema.css. */
+
+.oculto {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------ barra de navegação */
+
+.pagina--com-barra {
+  padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Tela com moldura própria mostrada dentro da moldura com barra. */
+.pagina--com-barra .pagina {
+  min-height: 0;
+}
+
+.barra {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  justify-content: space-around;
+  width: 100%;
+  max-width: 480px;
+  padding: 8px 4px calc(8px + env(safe-area-inset-bottom, 0px));
+  background: var(--cor-cartao);
+  border-top: 1px solid var(--cor-borda);
+}
+
+.barra__item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+  color: var(--cor-texto-suave);
+  font-size: 0.8rem;
+  text-decoration: none;
+}
+
+.barra__icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 32px;
+  border-radius: 999px;
+}
+
+.barra__rotulo {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.barra__item--ativo {
+  color: var(--cor-primaria);
+  font-weight: 600;
+}
+
+.barra__item--ativo .barra__icone {
+  background: var(--cor-ok-fundo);
+}
+
+.barra__item:focus-visible {
+  outline: 3px solid var(--cor-destaque);
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+
+/* ------------------------------------------------------------ botões extras */
+
+.botao {
+  gap: 8px;
+}
+
+.botao--espaco {
+  margin-top: 12px;
+}
+
+.botao--perigo {
+  background: var(--cor-alerta-texto);
+  color: #fff;
+}
+
+.botao--texto-perigo {
+  margin-top: 12px;
+  background: none;
+  color: var(--cor-alerta-texto);
+}
+
+.botao-pequeno {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px 16px;
+  font-family: var(--fonte-texto);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--cor-primaria);
+  background: var(--cor-ok-fundo);
+  border: none;
+  border-radius: 999px;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.botao-pequeno--perigo {
+  color: var(--cor-alerta-texto);
+  background: var(--cor-alerta-fundo);
+}
+
+.botao-pequeno:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.botao-redondo,
+.botao-icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  text-decoration: none;
+}
+
+.botao-redondo {
+  background: var(--cor-primaria);
+  color: #fff;
+}
+
+.botao-icone {
+  color: var(--cor-texto);
+}
+
+.topo__acao {
+  margin-left: auto;
+}
+
+.estado-tela {
+  margin: 24px 0;
+}
+
+/* ------------------------------------------------------------------ início */
+
+.inicio__topo {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.inicio__veiculo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--cor-texto);
+  text-decoration: none;
+}
+
+.inicio__avatar {
+  text-decoration: none;
+}
+
+.inicio__avatar .avatar {
+  width: 52px;
+  height: 52px;
+  font-size: 1.3rem;
+  background: var(--cor-ok-fundo);
+  color: var(--cor-primaria);
+}
+
+.titulo-pagina--veiculo {
+  font-size: 2.2rem;
+  margin: 0 0 6px;
+}
+
+.placa {
+  display: inline-block;
+  padding: 3px 10px 2px;
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: 0.08em;
+  color: var(--cor-texto);
+  background: #fff;
+  border: 2px solid var(--cor-texto);
+  border-top: 6px solid #1f4fa3;
+  border-radius: 6px;
+}
+
+.cartao-km {
+  background: var(--cor-petroleo-escuro);
+  color: #f3f7f8;
+  border-radius: var(--raio-cartao);
+  padding: 20px 20px 18px;
+  margin-bottom: 18px;
+}
+
+.cartao-km__rotulo {
+  margin: 0 0 10px;
+  color: var(--cor-texto-claro);
+}
+
+.cartao-km__rodape {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.cartao-km__data {
+  margin: 0;
+  color: var(--cor-texto-claro);
+  font-size: 0.95rem;
+}
+
+.cartao-km__botao {
+  flex-shrink: 0;
+  padding: 12px 18px;
+  font-weight: 600;
+  color: var(--cor-petroleo-escuro);
+  background: #dfe8ea;
+  border-radius: 999px;
+  text-decoration: none;
+}
+
+.hodometro {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  margin: 0;
+}
+
+.hodometro__casa {
+  min-width: 40px;
+  padding: 4px 0;
+  text-align: center;
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 2.4rem;
+  line-height: 1.15;
+  background: linear-gradient(#06252e, #0f4150 50%, #06252e);
+  border-radius: 8px;
+}
+
+.hodometro__casa--vazia {
+  color: #5f8794;
+}
+
+.hodometro__unidade {
+  margin-left: 6px;
+  padding-bottom: 6px;
+  font-family: var(--fonte-titulo);
+  font-size: 1.3rem;
+  color: var(--cor-texto-claro);
+}
+
+/* -------------------------------------------------------------------- menu */
+
+.menu__icone {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  color: var(--cor-primaria);
+  background: var(--cor-ok-fundo);
+  border-radius: 12px;
+}
+
+.menu__texto {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.menu__titulo {
+  font-weight: 600;
+}
+
+.menu__descricao {
+  color: var(--cor-texto-suave);
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- veículos */
+
+.lista-cartoes,
+.lista-leituras {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rotulo-secao {
+  margin: 8px 0 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--cor-neutro-texto);
+}
+
+.cartao-veiculo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+}
+
+.cartao-veiculo__principal {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--cor-texto);
+  text-decoration: none;
+}
+
+.cartao-veiculo__texto {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.foto {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 14px;
+  background: var(--cor-neutro-fundo);
+}
+
+.foto--vazia {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--cor-neutro-texto);
+  background: repeating-linear-gradient(135deg, #d5dddd, #d5dddd 14px, #cbd5d5 14px, #cbd5d5 28px);
+}
+
+.foto__aviso {
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.foto--miniatura {
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+}
+
+.capa-veiculo {
+  position: relative;
+  height: 210px;
+  margin-bottom: 16px;
+}
+
+.capa-veiculo__botao {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  font-weight: 600;
+  color: var(--cor-texto);
+  background: var(--cor-cartao);
+  border-radius: 999px;
+  text-decoration: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.linha-selos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 18px;
+}
+
+.cartao--linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cartao--linha p,
+.cartao__rotulo {
+  margin: 0;
+}
+
+.numero-destaque {
+  margin: 2px 0;
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 2rem;
+  line-height: 1.1;
+}
+
+.cabecalho-secao {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.titulo-secao--espaco {
+  margin-top: 28px;
+}
+
+.tira-fotos {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.tira-fotos__adicionar,
+.tira-fotos__item,
+.grade-fotos__item {
+  position: relative;
+  display: flex;
+  aspect-ratio: 1;
+  border-radius: 14px;
+  text-decoration: none;
+  overflow: hidden;
+}
+
+.tira-fotos__adicionar {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cor-primaria);
+  border: 2px dashed #8e9da2;
+}
+
+.etiqueta-foto {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  padding: 2px 9px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--cor-primaria);
+  border-radius: 999px;
+}
+
+/* -------------------------------------------------------------- formulários */
+
+.dupla {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.dupla--botoes {
+  margin: 12px 0 8px;
+}
+
+.separador {
+  border: none;
+  border-top: 1px solid var(--cor-borda);
+  margin: 10px 0 22px;
+}
+
+.secao__dica {
+  margin: -6px 0 16px;
+  font-size: 0.95rem;
+}
+
+.opcoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.opcao {
+  min-height: 46px;
+  padding: 8px 18px;
+  font-family: var(--fonte-texto);
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: var(--cor-texto);
+  background: var(--cor-cartao);
+  border: 1px solid #8e9da2;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.opcao--ativa {
+  color: #fff;
+  background: var(--cor-primaria);
+  border-color: var(--cor-primaria);
+}
+
+.opcao:focus-visible,
+.chave__botao:focus-visible,
+.botao-pequeno:focus-visible,
+.area-foto:focus-visible {
+  outline: 3px solid var(--cor-destaque);
+  outline-offset: 2px;
+}
+
+.area-foto {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 170px;
+  padding: 16px;
+  font-family: var(--fonte-texto);
+  font-size: 1rem;
+  color: var(--cor-primaria);
+  background: var(--cor-cartao);
+  border: 2px dashed #8e9da2;
+  border-radius: var(--raio-cartao);
+  cursor: pointer;
+}
+
+.area-foto__titulo {
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.area-foto__previa {
+  max-width: 100%;
+  max-height: 180px;
+  border-radius: 12px;
+}
+
+.chave {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.chave__descricao {
+  margin: 0;
+}
+
+.chave__botao {
+  flex-shrink: 0;
+  position: relative;
+  width: 60px;
+  height: 36px;
+  padding: 0;
+  background: #7f8e93;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.chave__botao--ligada {
+  background: var(--cor-primaria);
+}
+
+.chave__bolinha {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 28px;
+  height: 28px;
+  background: #fff;
+  border-radius: 50%;
+  transition: left 0.15s;
+}
+
+.chave__botao--ligada .chave__bolinha {
+  left: 28px;
+}
+
+/* ----------------------------------------------------------------- diálogo */
+
+.dialogo__fundo {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(11, 52, 64, 0.55);
+}
+
+.dialogo {
+  width: 100%;
+  max-width: 448px;
+  padding: 22px 20px 20px;
+  background: var(--cor-cartao);
+  border-radius: var(--raio-cartao);
+}
+
+.dialogo__titulo {
+  margin: 0 0 8px;
+  font-family: var(--fonte-titulo);
+  font-size: 1.6rem;
+}
+
+.dialogo__texto p {
+  margin: 0 0 18px;
+  color: var(--cor-neutro-texto);
+}
+
+.dialogo__acoes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* ------------------------------------------------------------ quilometragem */
+
+.leitura {
+  padding: 14px 16px;
+  margin-bottom: 10px;
+}
+
+.leitura__linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.leitura__linha p {
+  margin: 0;
+}
+
+.leitura__km {
+  font-weight: 600;
+  font-size: 1.2rem;
+}
+
+.leitura--anulada .leitura__km {
+  text-decoration: line-through;
+  color: var(--cor-texto-suave);
+}
+
+.leitura__motivo {
+  margin: 8px 0 0;
+  font-size: 0.95rem;
+}
+
+.leitura__acoes {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.correcao {
+  margin: 14px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--cor-borda);
+}
+
+/* ------------------------------------------------------------------- fotos */
+
+.grade-fotos {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.previa-foto {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 220px;
+  padding: 16px;
+  text-align: center;
+  color: var(--cor-neutro-texto);
+  border-radius: var(--raio-cartao);
+  overflow: hidden;
+  background: repeating-linear-gradient(135deg, #d5dddd, #d5dddd 14px, #cbd5d5 14px, #cbd5d5 28px);
+}
+
+.previa-foto img {
+  display: block;
+  max-width: 100%;
+  max-height: 60vh;
+  border-radius: 12px;
+}
+
+.previa-foto__nome {
+  margin: 8px 0 0;
+  font-size: 0.95rem;
+  word-break: break-all;
+}
+
+.foto-grande {
+  position: relative;
+  min-height: 200px;
+  margin-bottom: 10px;
+}
+
+.foto-grande .foto {
+  height: auto;
+  max-height: 70vh;
+  object-fit: contain;
+}
+
+.foto-grande .foto--vazia {
+  height: 220px;
+}

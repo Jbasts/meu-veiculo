@@ -36,6 +36,18 @@ MENSAGENS_DE_FORMATO = {
     "extra_forbidden": "Campo não permitido.",
     "string_too_long": "Texto longo demais.",
     "string_type": "Informe um texto.",
+    "int_parsing": "Informe um número inteiro.",
+    "int_type": "Informe um número inteiro.",
+    "int_from_float": "Informe um número inteiro.",
+    "greater_than_equal": "Número fora do intervalo permitido.",
+    "less_than_equal": "Número fora do intervalo permitido.",
+    "date_type": "Data inválida.",
+    "date_parsing": "Data inválida.",
+    "date_from_datetime_parsing": "Data inválida.",
+    "date_from_datetime_inexact": "Data inválida.",
+    "decimal_parsing": "Valor em dinheiro inválido.",
+    "decimal_type": "Valor em dinheiro inválido.",
+    "bool_parsing": "Informe sim ou não.",
     "json_invalid": "Os dados enviados não estão em formato JSON válido.",
     "model_attributes_type": "Envie os dados em formato JSON.",
     "dict_type": "Envie os dados em formato JSON.",
@@ -62,7 +74,8 @@ async def tratar_erro_de_formato(_requisicao: Request, erro: Exception) -> JSONR
     assert isinstance(erro, RequestValidationError)
     campos: dict[str, str] = {}
     for detalhe in erro.errors():
-        local = [str(parte) for parte in detalhe.get("loc", ()) if parte != "body"]
+        local = [str(parte) for parte in detalhe.get("loc", ())
+                 if parte not in ("body", "path", "query")]
         nome = ".".join(local) or "corpo"
         campos.setdefault(nome, MENSAGENS_DE_FORMATO.get(detalhe.get("type", ""), "Valor inválido."))
     corpo = ErroResposta(mensagem="Confira os dados enviados.", campos=campos)

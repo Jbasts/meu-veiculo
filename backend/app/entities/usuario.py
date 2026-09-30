@@ -1,4 +1,5 @@
-"""Tabela usuario (SQL original, com o e-mail normalizado pela migration 0002)."""
+"""Tabela usuario (SQL original, com o e-mail normalizado pela migration 0002
+e o veículo em uso da migration 0003)."""
 
 from datetime import datetime
 
@@ -24,6 +25,8 @@ class Usuario(Base):
     ativo: Mapped[bool] = mapped_column(server_default=text("true"))
     ultimo_acesso: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Veículo selecionado nas telas. O banco garante que é um veículo do próprio usuário.
+    veiculo_em_uso_id: Mapped[int | None]
 
     @property
     def eh_admin(self) -> bool:

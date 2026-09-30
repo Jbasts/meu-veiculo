@@ -25,11 +25,15 @@ export function json(status: number, corpo: unknown): Response {
 
 type Tratador = (corpo: unknown, opcoes: RequestInit) => Response | Promise<Response>;
 
-/** Simula a API: chave "MÉTODO /caminho" → resposta. Devolve o mock para conferir chamadas. */
+/**
+ * Simula a API: chave "MÉTODO /caminho" → resposta. Devolve o mock para conferir chamadas.
+ * Quem não simular "GET /api/veiculos" recebe uma conta sem veículos.
+ */
 export function apiFalsa(rotas: Record<string, Tratador>) {
+  const todas: Record<string, Tratador> = { "GET /api/veiculos": () => json(200, []), ...rotas };
   const buscar = vi.fn(async (url: string, opcoes: RequestInit = {}) => {
     const chave = `${opcoes.method ?? "GET"} ${url}`;
-    const tratador = rotas[chave];
+    const tratador = todas[chave];
     if (!tratador) throw new Error(`Rota não simulada no teste: ${chave}`);
     const corpo = typeof opcoes.body === "string" ? JSON.parse(opcoes.body) : undefined;
     return tratador(corpo, opcoes);

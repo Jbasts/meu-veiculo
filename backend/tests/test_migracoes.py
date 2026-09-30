@@ -22,7 +22,7 @@ from app.banco.sql_original import comparar_com_original
 from app.config import obter_configuracoes
 from tests.conftest import criar_com_sql_original_sem_controle
 
-TODAS = ["0001", "0002"]
+TODAS = ["0001", "0002", "0003"]
 
 
 def tem_tabela(engine, nome: str) -> bool:

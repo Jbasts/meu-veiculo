@@ -5,10 +5,12 @@ manutenções, diagnósticos, projetos de melhoria e fotos. É uma aplicação w
 responsiva e instalável (PWA), feita com React + TypeScript no frontend,
 FastAPI (Python) no backend e PostgreSQL no banco de dados.
 
-> **Estado atual: etapa 2 (contas e permissões).** Já funcionam: criar conta,
-> entrar, sair, trocar senha, recuperar senha por link, limite de tentativas,
-> permissões de usuário/admin no backend e criação do primeiro admin. Veículos,
-> manutenções e o restante entram nas próximas etapas. Veja `docs/progresso.md`.
+> **Estado atual: etapa 3 (veículos, quilometragem e base das fotos).** Já
+> funcionam: contas e permissões (etapa 2), cadastro e edição de veículos,
+> veículo em uso, inativação, leituras de quilometragem com histórico e
+> correção, fotos com capa e galeria, e a barra de navegação inferior.
+> Manutenções, diagnósticos, finanças e o restante entram nas próximas etapas.
+> Veja `docs/progresso.md`.
 
 ---
 
@@ -24,6 +26,7 @@ FastAPI (Python) no backend e PostgreSQL no banco de dados.
 8. [Problemas comuns](#8-problemas-comuns)
 9. [Contas, senhas e permissões](#9-contas-senhas-e-permissões)
 10. [E-mail (recuperação de senha)](#10-e-mail-recuperação-de-senha)
+11. [Veículos, quilometragem e fotos](#11-veículos-quilometragem-e-fotos)
 
 ---
 
@@ -56,6 +59,7 @@ meu-veiculo/
 │   ├── alembic.ini              configuração das migrations
 │   ├── migrations/versions/     migrations numeradas (0001, 0002...)
 │   ├── tests/                   testes (pytest, PostgreSQL de teste)
+│   ├── storage/                 arquivos das fotos (fora do Git; criada no primeiro envio)
 │   └── app/
 │       ├── main.py              cria a API e registra as routes
 │       ├── config.py            lê o backend/.env
@@ -171,14 +175,14 @@ O frontend segue a organização comum de projetos React (não a do backend):
 
 | Pasta | O que vai nela |
 |---|---|
-| `pages/` | uma tela inteira por endereço (`LoginPage`, `CadastroPage`, `EsqueciSenhaPage`, `RedefinirSenhaPage`, `InicioPage`, `ContaPage`, `SituacaoSistemaPage`) |
-| `components/` | peças visuais reaproveitáveis (`CampoTexto`, `CampoSenha` com o olho, `BotaoEnviar`, `Alerta`, `TopoComVoltar`, `RotaProtegida`...) |
-| `contexts/` | `AuthContext`: quem está logado, para todas as telas. Fica só na memória da página (nada em `localStorage`). |
-| `hooks/` | `useEnvioFormulario`: "enviando", trava contra envio duplicado e erros da API por campo |
+| `pages/` | uma tela inteira por endereço (`LoginPage`, `CadastroPage`, `InicioPage`, `MaisPage`, `VeiculosPage`, `VeiculoFormPage`, `VeiculoDetalhePage`, `QuilometragemPage`, `FotosPage`, `FotoNovaPage`, `FotoDetalhePage`, `ContaPage`...) |
+| `components/` | peças visuais reaproveitáveis (`CampoTexto`, `CampoSenha` com o olho, `BotaoEnviar`, `Alerta`, `TopoComVoltar`, `RotaProtegida`, `BarraNavegacao`, `Formulario` com opções/chave/diálogo de confirmação, `PecasVeiculo` com placa/hodômetro/foto...) |
+| `contexts/` | `AuthContext`: quem está logado. `VeiculosContext`: os veículos da conta e o veículo em uso. Ficam só na memória da página (nada em `localStorage`). |
+| `hooks/` | `useEnvioFormulario`: "enviando", trava contra envio duplicado e erros da API por campo. `useVeiculoDaRota`: carrega o veículo do endereço. |
 | `services/` | conversa com a API. `apiCliente.ts` é o único lugar que chama `fetch` e envia o cabeçalho `X-MV-Requisicao`. |
 | `types/` | formatos dos dados, iguais aos schemas do backend |
-| `utils/` | funções auxiliares. `datas.ts` formata datas **sem** `new Date()`, para não voltar um dia por causa do fuso. |
-| `styles/` | tema com as cores do PDF (verde-petróleo, fundo claro, cartões) |
+| `utils/` | funções auxiliares. `datas.ts` formata datas **sem** `new Date()`, para não voltar um dia por causa do fuso. `formatos.ts` trata km, placa e dinheiro (dinheiro sempre como texto, nunca ponto flutuante). |
+| `styles/` | `tema.css` com as cores do PDF (verde-petróleo, fundo claro, cartões) e `veiculos.css` com a barra inferior e as telas de veículo |
 
 As fontes (Barlow e Barlow Condensed) vêm dentro do projeto (`@fontsource`),
 sem depender do Google Fonts.
@@ -382,7 +386,13 @@ npm run typecheck
 | `A migration 0002 parou: há e-mails incompatíveis` | dois cadastros antigos com o mesmo e-mail, diferentes só em maiúsculas ou espaços, ou e-mail sem `@` | seção 9.5 |
 | `Muitas tentativas de entrada` (tela Entrar) | 5 senhas erradas para o mesmo e-mail em 15 minutos | espere 15 minutos ou use "Esqueci minha senha" |
 | `Requisição recusada: ela não veio do aplicativo` | chamada à API sem o cabeçalho do app (ex.: pelo `/docs`) | normal para gravações fora do app; use as telas |
-| Tela Situação: "Pendente: 0002" | o banco de desenvolvimento ainda não recebeu a migration nova | `.\.venv\Scripts\python.exe gerenciar.py migrar` (pasta `backend`) |
+| Tela Situação: "Pendente: 0002" (ou 0003) | o banco de desenvolvimento ainda não recebeu a migration nova | `.\.venv\Scripts\python.exe gerenciar.py migrar` (pasta `backend`) |
+| `relação "leitura_km" não existe` ou erro 500 ao abrir o Início | mesma causa: falta aplicar a migration 0003 | `.\.venv\Scripts\python.exe gerenciar.py migrar` (pasta `backend`) |
+| `ModuleNotFoundError: No module named 'PIL'` (ou `pillow_heif`, `multipart`) ao iniciar o backend | as bibliotecas novas da etapa 3 não foram instaladas | `.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt` (pasta `backend`) |
+| `A migration 0003 parou: há placas incompatíveis` | dois veículos da mesma conta ficariam com a mesma placa, ou placa com caractere inválido | seção 11.6 |
+| `Esta leitura não combina com o histórico` | a quilometragem informada contradiz outra leitura (dia anterior com km maior, ou dia posterior com km menor) | confira valor e data; se a leitura antiga é que está errada, use "Corrigir" no histórico (seção 11.2) |
+| `Envio grande demais` ou `Foto grande demais` | foto acima de 10 MB | reduza a resolução na câmera ou escolha outra foto |
+| Foto aparece como "Imagem indisponível" | o arquivo sumiu da pasta `backend\storage` | seção 11.5 |
 
 ## 9. Contas, senhas e permissões
 
@@ -488,3 +498,103 @@ Alternativa local que imita um servidor SMTP: o programa gratuito **Mailpit**
 (https://mailpit.axllent.org). Com ele rodando, use `EMAIL_MODO=smtp`,
 `SMTP_HOST=localhost`, `SMTP_PORTA=1025`, `SMTP_SEGURANCA=nenhuma`, sem
 usuário e senha, e veja as mensagens em http://localhost:8025.
+
+## 11. Veículos, quilometragem e fotos
+
+### 11.1 Veículos
+
+| Item | Regra |
+|---|---|
+| Dono | sempre quem está logado. O cadastro recusa `usuario_id` vindo da tela. |
+| Placa | guardada em maiúsculas, sem hífen e sem espaços (`abc-1234` vira `ABC1234`). Aceita o formato antigo (`ABC-1234`) e o Mercosul (`ABC1D23`). A tela mostra o hífen só na placa antiga. |
+| Placa repetida | a unicidade é **por conta**: a mesma pessoa não cadastra a placa duas vezes, mas duas pessoas podem ter a mesma placa (compra e venda entre usuários). |
+| Combustível | os sete valores do banco: flex, gasolina, etanol, diesel, GNV, híbrido e elétrico. |
+| Dinheiro | o valor pago viaja como texto (`"65000.00"`) e é `Decimal` no backend. Mais de duas casas decimais é recusado, não arredondado em silêncio. |
+| Veículo em uso | fica gravado na conta (vale em qualquer aparelho). O veículo recém-cadastrado vira o veículo em uso. |
+| Inativar | para carro vendido. Nada é apagado: leituras, fotos e registros continuam consultáveis. O veículo inativo fica somente para leitura até ser reativado. Não existe "apagar veículo". |
+| Permissão | quem não é o dono (nem admin) recebe "Veículo não encontrado", a mesma resposta de um veículo que não existe. |
+
+### 11.2 Quilometragem
+
+Cada atualização é uma **leitura**: o valor e o dia em que o hodômetro marcava
+esse valor. A tabela `leitura_km` guarda também quando a leitura foi digitada.
+
+- A quilometragem atual é sempre a **maior leitura válida**, e a data mostrada
+  na tela é a data dessa leitura. Quem calcula é o banco, a cada mudança.
+- Registro antigo (km menor) entra no histórico e **não reduz** a quilometragem atual.
+- Manutenção apenas agendada não gera leitura. Mudar só o status para
+  "realizada" gera (o trigger do SQL original não via essa mudança).
+- O hodômetro só anda para a frente: uma leitura de um dia anterior com km
+  maior, ou de um dia posterior com km menor, é recusada. No mesmo dia,
+  qualquer ordem é aceita.
+- Veículos que já existiam antes da migration 0003 podem ter uma leitura
+  "anterior ao histórico", sem data. A tela mostra "Data da leitura
+  desconhecida" em vez de inventar uma data.
+
+**Corrigir uma quilometragem digitada errada** (tela Quilometragem, botão
+"Corrigir" na leitura):
+
+1. Informe o valor certo e, se quiser, o motivo.
+2. A leitura errada fica no histórico, riscada e marcada como "Anulada"; a
+   leitura nova entra com a mesma data.
+3. O banco recalcula a quilometragem atual na hora. Os indicadores das
+   próximas etapas (consumo, custo por km, planos) são sempre calculados a
+   partir das leituras válidas, então refletem a correção.
+
+"Anular" retira uma leitura que não deveria existir (não é possível anular a
+única leitura do veículo). Leituras que vieram de um abastecimento, manutenção
+ou diagnóstico são corrigidas editando esse registro.
+
+### 11.3 Fotos
+
+| Item | Regra |
+|---|---|
+| Formatos | JPEG, PNG, WebP e HEIC, até 10 MB (10.485.760 bytes). |
+| Conferência | o backend identifica o formato pelos primeiros bytes do arquivo e abre a imagem inteira. A extensão e o tipo informado pelo navegador não são levados em conta. |
+| Regravação | a imagem é regravada do zero: somem conteúdos escondidos e os metadados, inclusive a **localização GPS** que o celular grava. A rotação é aplicada antes. Fotos maiores que 2560 pontos no lado maior são reduzidas. |
+| HEIC | é o formato da câmera do iPhone, que o Chrome do Android não exibe. O backend converte para JPEG; o tipo e o tamanho gravados no banco são os do arquivo convertido. |
+| Onde ficam | arquivos em `backend\storage\veiculos\<id do veículo>\` (fora do Git), com nome gerado pelo backend. O banco guarda só os metadados. Para mudar a pasta: `PASTA_FOTOS` no `.env`. |
+| Acesso | a pasta não é pública. A imagem sai por `/api/veiculos/{id}/fotos/{id}/arquivo`, que confere a sessão e o dono a cada pedido. Conhecer o endereço não dá acesso. |
+| Capa | no máximo uma por veículo (índice único no banco). A troca bloqueia a linha do veículo, então duas trocas simultâneas acontecem em sequência. |
+| Câmera | "Tirar foto" abre a câmera do celular; "Da galeria" abre os arquivos. Funciona em HTTP na rede local (o teste no celular fica para a etapa 10). |
+
+O vínculo da foto com manutenção, diagnóstico ou projeto entra nas etapas 4, 5 e 8.
+
+### 11.4 Backup das fotos
+
+O backup do banco (`gerenciar.py backup`) **não inclui as fotos**. Copie também
+a pasta `backend\storage`. Exemplo (pasta `meu-veiculo`):
+
+```powershell
+Copy-Item -Recurse backend\storage D:\backup\meu-veiculo-fotos
+```
+
+### 11.5 Arquivos órfãos
+
+O arquivo é gravado antes da linha no banco e apagado depois dela. Se o
+computador desligar no meio, pode sobrar um arquivo sem registro (ninguém
+consegue acessá-lo, mas ocupa espaço). Para conferir (pasta `backend`):
+
+```powershell
+.\.venv\Scripts\python.exe gerenciar.py limpar-fotos
+```
+
+O comando só **lista**: arquivos sem registro com mais de 1 hora, e fotos do
+banco cujo arquivo sumiu. Para apagar os arquivos sem registro:
+
+```powershell
+.\.venv\Scripts\python.exe gerenciar.py limpar-fotos --apagar
+```
+
+### 11.6 Se a migration 0003 parar por causa de placas antigas
+
+Ela lista, por exemplo: `usuário 3: ficariam com a mesma placa 'ABC1234':
+veículos 5 (ABC-1234), 9 (abc1234)`. Nada foi alterado. Confira qual cadastro
+é o correto e corrija a placa do outro à mão (por exemplo, no pgAdmin). Não
+apague nem una veículos sem conferir os registros de cada um. Depois rode de
+novo `gerenciar.py migrar`.
+
+Se a migration avisar `o km atual era X, mas há registro com Y km`, ela
+seguiu em frente: a quilometragem atual passou a ser a maior leitura. Confira
+na tela Quilometragem de onde veio cada leitura e corrija o registro errado,
+se houver.

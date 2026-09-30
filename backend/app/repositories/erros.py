@@ -16,3 +16,13 @@ class BancoIndisponivel(ErroRepositorio):
 
 class EmailJaCadastrado(ErroRepositorio):
     """O índice único usuario_email_unico recusou o e-mail."""
+
+
+class PlacaJaCadastrada(ErroRepositorio):
+    """A restrição UNIQUE (usuario_id, placa) recusou a placa."""
+
+
+def restricao_violada(erro: Exception) -> str | None:
+    """Nome da restrição do banco que causou o erro (None se não houver)."""
+    diagnostico = getattr(getattr(erro, "orig", None), "diag", None)
+    return getattr(diagnostico, "constraint_name", None)

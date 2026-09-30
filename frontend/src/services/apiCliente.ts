@@ -68,10 +68,25 @@ function mensagemDoCorpo(corpo: unknown): { mensagem?: string; campos?: Record<s
   };
 }
 
-/** Chama a API e devolve o corpo em caso de sucesso; lança ErroDaApi nos demais casos. */
+// Quando a API responde 401 no meio do uso (sessão expirada, conta desativada,
+// senha trocada em outro aparelho), o app precisa voltar para a tela Entrar.
+// O AuthContext registra aqui o que fazer nesse caso.
+let aoPerderSessao: (() => void) | null = null;
+
+export function definirAoPerderSessao(acao: (() => void) | null): void {
+  aoPerderSessao = acao;
+}
+
+/**
+ * Chama a API e devolve o corpo em caso de sucesso; lança ErroDaApi nos demais casos.
+ * "dados" pode ser um objeto (enviado como JSON) ou um FormData (envio de arquivo).
+ */
 export async function chamarApi<T>(metodo: string, caminho: string, dados?: unknown): Promise<T> {
   const opcoes: RequestInit = { method: metodo };
-  if (dados !== undefined) {
+  if (dados instanceof FormData) {
+    // Sem Content-Type: o navegador define o tipo e o separador do formulário.
+    opcoes.body = dados;
+  } else if (dados !== undefined) {
     opcoes.body = JSON.stringify(dados);
     opcoes.headers = { "Content-Type": "application/json" };
   }
@@ -81,6 +96,10 @@ export async function chamarApi<T>(metodo: string, caminho: string, dados?: unkn
   }
   if (resposta.status >= 200 && resposta.status < 300) {
     return resposta.corpo as T;
+  }
+  // Nas rotas de conta (/auth/...), 401 é resposta normal (senha errada, ninguém logado).
+  if (resposta.status === 401 && !caminho.startsWith("/auth/")) {
+    aoPerderSessao?.();
   }
   const { mensagem, campos } = mensagemDoCorpo(resposta.corpo);
   throw new ErroDaApi(

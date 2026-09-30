@@ -26,18 +26,27 @@ from app.banco.conexao import obter_engine
 from app.banco.sessao import UnidadeDeTrabalho, abrir_sessao
 from app.config import Configuracoes, obter_configuracoes
 from app.controllers.auth_controller import AuthController, ConfigCookie, ler_token
+from app.controllers.foto_controller import FotoController
 from app.controllers.saude_controller import SaudeController
+from app.controllers.veiculo_controller import VeiculoController
 from app.entities.sessao import SessaoAtual
+from app.repositories.arquivo_foto_repository import ArquivoFotoRepository
+from app.repositories.foto_repository import FotoRepository
+from app.repositories.leitura_km_repository import LeituraKmRepository
 from app.repositories.recuperacao_senha_repository import RecuperacaoSenhaRepository
 from app.repositories.saude_repository import SaudeRepository
 from app.repositories.sessao_repository import SessaoRepository
 from app.repositories.tentativa_acesso_repository import TentativaAcessoRepository
 from app.repositories.usuario_repository import UsuarioRepository
+from app.repositories.veiculo_repository import VeiculoRepository
 from app.services.autenticacao_service import AutenticacaoService
 from app.services.email_service import EnviadorEmail, criar_enviador
 from app.services.erros import AcessoNegado
+from app.services.foto_service import FotoService
+from app.services.quilometragem_service import QuilometragemService
 from app.services.saude_service import SaudeService
 from app.services.senha_service import SenhaService
+from app.services.veiculo_service import VeiculoService
 
 CABECALHO_DO_APP = "X-MV-Requisicao"
 METODOS_QUE_GRAVAM = {"POST", "PUT", "PATCH", "DELETE"}
@@ -95,6 +104,28 @@ def obter_auth_controller(
 
 def obter_saude_controller(sessao: SessaoDep) -> SaudeController:
     return SaudeController(SaudeService(SaudeRepository(sessao)))
+
+
+def obter_veiculo_controller(sessao: SessaoDep) -> VeiculoController:
+    uow = UnidadeDeTrabalho(sessao)
+    veiculos = VeiculoRepository(sessao)
+    return VeiculoController(
+        VeiculoService(uow, veiculos, FotoRepository(sessao)),
+        QuilometragemService(uow, veiculos, LeituraKmRepository(sessao)),
+    )
+
+
+def obter_arquivos_de_foto(cfg: ConfigDep) -> ArquivoFotoRepository:
+    return ArquivoFotoRepository(cfg.pasta_fotos)
+
+
+def obter_foto_controller(
+    sessao: SessaoDep,
+    arquivos: Annotated[ArquivoFotoRepository, Depends(obter_arquivos_de_foto)],
+) -> FotoController:
+    return FotoController(FotoService(
+        UnidadeDeTrabalho(sessao), VeiculoRepository(sessao), FotoRepository(sessao), arquivos,
+    ))
 
 
 # --------------------------------------------------------------------- proteções

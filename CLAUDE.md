@@ -47,7 +47,7 @@ meu-veiculo/
 ├── CLAUDE.md
 ├── README.md                 # guia completo, atualizado a cada etapa
 ├── backend/
-│   ├── gerenciar.py          # comandos do banco (criar-bancos, estado, migrar, adotar, backup)
+│   ├── gerenciar.py          # comandos (criar-bancos, estado, migrar, adotar, backup, promover-admin, limpar-fotos)
 │   ├── migrations/versions/  # Alembic; 0001 = SQL original (conferido por SHA-256)
 │   ├── tests/                # pytest no PostgreSQL de teste
 │   └── app/
@@ -65,6 +65,8 @@ Fluxo: Route → Controller → Service → Repository → `banco/` → PostgreS
 
 - routes: só endpoints; controllers: requisição/resposta HTTP e tradução de erros; services: regras e transações (`UnidadeDeTrabalho`), sem FastAPI nem SQLAlchemy; repositories: todo o SQL; entities: classes SQLAlchemy das tabelas existentes (nunca `create_all`); schemas: JSON de entrada/saída (Pydantic); banco: conexão, sessão, migrations, backup.
 - `tests/test_arquitetura.py` impede imports que furem as camadas; `tests/test_entities.py` confere entities com o banco.
+- Todo acesso a veículo passa por `services/acesso_veiculo.py` (`AcessoVeiculo.exigir` / `exigir_para_alterar`): dono ou admin, senão 404; veículo inativo é somente leitura. Registros filhos (leitura, foto...) levam o id do veículo no endereço e o service confere se são daquele veículo.
+- `veiculo.quilometragem` nunca é alterada direto: registre ou corrija uma leitura em `leitura_km` (o banco recalcula). Listagens que crescem usam `services/paginacao.py`.
 - Rotas que exigem login usam `SessaoAtualDep`; só admin, `AdminDep` (`app/dependencias.py`). Toda gravação exige o cabeçalho `X-MV-Requisicao: 1` (o `apiCliente.ts` já envia). Erros de regra: classes de `services/erros.py`.
 - Frontend segue organização React (pages, components, services, types), não as camadas do backend.
 
@@ -78,6 +80,7 @@ PowerShell. No PowerShell, o `npm` exige `Set-ExecutionPolicy -Scope CurrentUser
 - Banco já existente criado com o SQL original (pasta `backend`): `... gerenciar.py backup` e `... gerenciar.py adotar-banco-existente`
 - Primeiro administrador (pasta `backend`, conta já criada pela tela): `.\.venv\Scripts\python.exe gerenciar.py promover-admin EMAIL`
 - E-mails de desenvolvimento (modo arquivo): arquivos `.eml` em `backend\emails_dev\` (fora do Git)
+- Fotos: arquivos em `backend\storage\` (fora do Git; `PASTA_FOTOS`). Conferir órfãos (pasta `backend`): `.\.venv\Scripts\python.exe gerenciar.py limpar-fotos` (`--apagar` para apagar)
 - Iniciar backend (pasta `backend`): `.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload` → http://127.0.0.1:8000/docs
 - Preparar frontend (pasta `frontend`): `npm ci`
 - Iniciar frontend (pasta `frontend`): `npm run dev` → http://localhost:5173

@@ -43,6 +43,9 @@ class Configuracoes(BaseSettings):
     # Pasta onde os backups automáticos são gravados.
     pasta_backups: Path = PASTA_BACKEND / "backups"
 
+    # Pasta onde ficam os arquivos das fotos (fora do banco e fora do Git).
+    pasta_fotos: Path = PASTA_BACKEND / "storage"
+
     # Endereço do frontend, usado nos links enviados por e-mail.
     url_frontend: str = "http://localhost:5173"
 

@@ -6,6 +6,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
+import { definirAoPerderSessao } from "../services/apiCliente";
 import * as authService from "../services/authService";
 import type { Usuario } from "../types/usuario";
 
@@ -69,6 +70,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const esquecerUsuario = useCallback(() => setUsuario(null), []);
+
+  // Sessão encerrada no meio do uso (API respondeu 401): volta para Entrar.
+  useEffect(() => {
+    definirAoPerderSessao(esquecerUsuario);
+    return () => definirAoPerderSessao(null);
+  }, [esquecerUsuario]);
 
   const valor = useMemo<EstadoAuth>(
     () => ({ carregando, usuario, erroInicial, entrar, cadastrar, sair, esquecerUsuario, recarregar }),
