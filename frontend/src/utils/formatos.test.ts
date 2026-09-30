@@ -12,6 +12,7 @@ import {
   mascararInteiro,
   normalizarPlaca,
   placaValida,
+  somarDinheiro,
 } from "./formatos";
 
 describe("quilometragem", () => {
@@ -65,6 +66,14 @@ describe("dinheiro (sempre texto, nunca ponto flutuante)", () => {
     // 0.1 + 0.2 em ponto flutuante dá 0.30000000000000004; aqui nada é somado.
     expect(lerDinheiro("1.000.000,29")).toBe("1000000.29");
     expect(formatarDinheiro("1000000.29")).toBe("R$ 1.000.000,29");
+  });
+
+  it("soma em centavos inteiros, sem erro de arredondamento", () => {
+    expect(somarDinheiro(["0.10", "0.20"])).toBe("0.30");
+    expect(somarDinheiro(["70.00", "45.00"])).toBe("115.00");
+    expect(somarDinheiro(["0.05"])).toBe("0.05");
+    expect(somarDinheiro([])).toBe("0.00");
+    expect(somarDinheiro(["9999999999.99", "0.01"])).toBe("10000000000.00");
   });
 
   it("recusa texto que não é um valor em reais", () => {

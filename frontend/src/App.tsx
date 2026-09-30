@@ -14,7 +14,11 @@ import FotosPage from "./pages/FotosPage";
 import InicioPage from "./pages/InicioPage";
 import LoginPage from "./pages/LoginPage";
 import MaisPage from "./pages/MaisPage";
+import ManutencaoDetalhePage from "./pages/ManutencaoDetalhePage";
+import ManutencaoFormPage from "./pages/ManutencaoFormPage";
+import ManutencaoPage, { ManutencaoDoVeiculoPage } from "./pages/ManutencaoPage";
 import NaoEncontradaPage from "./pages/NaoEncontradaPage";
+import PlanoFormPage from "./pages/PlanoFormPage";
 import QuilometragemPage from "./pages/QuilometragemPage";
 import RedefinirSenhaPage from "./pages/RedefinirSenhaPage";
 import SituacaoSistemaPage from "./pages/SituacaoSistemaPage";
@@ -41,10 +45,11 @@ export function RotasDoApp() {
         {/* Telas com a barra de navegação inferior */}
         <Route element={<ComBarra />}>
           <Route path="/" element={<InicioPage />} />
-          <Route path="/manutencao" element={
-            <EmBrevePage titulo="Manutenção" etapa={4}
-              descricao="Aqui ficarão as manutenções pendentes, as realizadas e os planos." />
-          } />
+          <Route path="/manutencao" element={<ManutencaoPage />} />
+          <Route path="/veiculos/:veiculoId/manutencoes" element={<ManutencaoDoVeiculoPage />} />
+          <Route path="/veiculos/:veiculoId/manutencoes/:manutencaoId" element={<ManutencaoDetalhePage />} />
+          <Route path="/veiculos/:veiculoId/planos/novo" element={<PlanoFormPage />} />
+          <Route path="/veiculos/:veiculoId/planos/:planoId" element={<PlanoFormPage />} />
           <Route path="/diagnostico" element={
             <EmBrevePage titulo="Diagnóstico" etapa={5}
               descricao="Aqui ficarão os problemas registrados, com anotações e fotos." />
@@ -65,6 +70,8 @@ export function RotasDoApp() {
         <Route path="/veiculos/novo" element={<NovoVeiculoPage />} />
         <Route path="/veiculos/:veiculoId/editar" element={<EditarVeiculoPage />} />
         <Route path="/veiculos/:veiculoId/fotos/nova" element={<FotoNovaPage />} />
+        <Route path="/veiculos/:veiculoId/manutencoes/nova" element={<ManutencaoFormPage />} />
+        <Route path="/veiculos/:veiculoId/manutencoes/:manutencaoId/editar" element={<ManutencaoFormPage />} />
       </Route>
       <Route path="/entrar" element={<RotaSoParaVisitante><LoginPage /></RotaSoParaVisitante>} />
       <Route path="/criar-conta" element={<RotaSoParaVisitante><CadastroPage /></RotaSoParaVisitante>} />

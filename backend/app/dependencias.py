@@ -10,9 +10,12 @@ passa a usar o banco de teste.
 Também ficam aqui as proteções usadas pelas routes:
 - SessaoAtualDep: exige usuário logado (401 se não houver sessão válida);
 - AdminDep: exige perfil admin (403 para os demais);
-- verificar_cabecalho_do_app: recusa gravações que não vieram do app.
+- verificar_cabecalho_do_app: recusa gravações que não vieram do app;
+- exigir_banco_atualizado: 503 com explicação se o banco estiver numa versão
+  diferente da que o código espera (em vez de erro 500 no meio do uso).
 """
 
+import logging
 from collections.abc import Iterator
 from datetime import timedelta
 from functools import lru_cache
@@ -24,15 +27,18 @@ from sqlalchemy.orm import Session
 
 from app.banco.conexao import obter_engine
 from app.banco.sessao import UnidadeDeTrabalho, abrir_sessao
+from app.banco.versao import problema_de_versao
 from app.config import Configuracoes, obter_configuracoes
 from app.controllers.auth_controller import AuthController, ConfigCookie, ler_token
 from app.controllers.foto_controller import FotoController
+from app.controllers.manutencao_controller import ManutencaoController
 from app.controllers.saude_controller import SaudeController
 from app.controllers.veiculo_controller import VeiculoController
 from app.entities.sessao import SessaoAtual
 from app.repositories.arquivo_foto_repository import ArquivoFotoRepository
 from app.repositories.foto_repository import FotoRepository
 from app.repositories.leitura_km_repository import LeituraKmRepository
+from app.repositories.manutencao_repository import ManutencaoRepository, PlanoRepository
 from app.repositories.recuperacao_senha_repository import RecuperacaoSenhaRepository
 from app.repositories.saude_repository import SaudeRepository
 from app.repositories.sessao_repository import SessaoRepository
@@ -41,8 +47,9 @@ from app.repositories.usuario_repository import UsuarioRepository
 from app.repositories.veiculo_repository import VeiculoRepository
 from app.services.autenticacao_service import AutenticacaoService
 from app.services.email_service import EnviadorEmail, criar_enviador
-from app.services.erros import AcessoNegado
+from app.services.erros import AcessoNegado, ServicoIndisponivel
 from app.services.foto_service import FotoService
+from app.services.manutencao_service import ManutencaoService, PlanoService
 from app.services.quilometragem_service import QuilometragemService
 from app.services.saude_service import SaudeService
 from app.services.senha_service import SenhaService
@@ -125,7 +132,22 @@ def obter_foto_controller(
 ) -> FotoController:
     return FotoController(FotoService(
         UnidadeDeTrabalho(sessao), VeiculoRepository(sessao), FotoRepository(sessao), arquivos,
+        ManutencaoRepository(sessao),
     ))
+
+
+def obter_manutencao_controller(
+    sessao: SessaoDep,
+    arquivos: Annotated[ArquivoFotoRepository, Depends(obter_arquivos_de_foto)],
+) -> ManutencaoController:
+    uow = UnidadeDeTrabalho(sessao)
+    veiculos = VeiculoRepository(sessao)
+    planos = PlanoRepository(sessao)
+    return ManutencaoController(
+        PlanoService(uow, veiculos, planos),
+        ManutencaoService(uow, veiculos, planos, ManutencaoRepository(sessao),
+                          LeituraKmRepository(sessao), FotoRepository(sessao), arquivos),
+    )
 
 
 # --------------------------------------------------------------------- proteções
@@ -144,6 +166,26 @@ def exigir_admin(atual: SessaoAtualDep) -> SessaoAtual:
 
 
 AdminDep = Annotated[SessaoAtual, Depends(exigir_admin)]
+
+
+def avisar_se_banco_desatualizado() -> None:
+    """Ao ligar o backend: avisa no terminal se o banco precisa de "gerenciar.py migrar"."""
+    log = logging.getLogger("app")
+    try:
+        problema = problema_de_versao(obter_engine())
+    except Exception:  # banco desligado, senha errada...: a tela "Situação do sistema" explica
+        log.warning("Não foi possível conferir a versão do banco ao iniciar.")
+        return
+    if problema:
+        log.warning("ATENÇÃO: %s", problema)
+
+
+def exigir_banco_atualizado(engine: Annotated[Engine, Depends(obter_engine)]) -> None:
+    """Todas as rotas, menos /api/saude (que mostra as pendências na tela
+    "Situação do sistema"), exigem o banco na versão do código."""
+    problema = problema_de_versao(engine)
+    if problema:
+        raise ServicoIndisponivel(problema)
 
 
 def verificar_cabecalho_do_app(requisicao: Request) -> None:

@@ -123,6 +123,12 @@ code {
   border-bottom: none;
 }
 
+/* Lista dentro de um cartão (data, quilometragem...): o .lista-status zera o
+   padding e anulava o espaço interno do cartão, deixando o texto na borda. */
+.cartao.lista-status {
+  padding: 4px 18px;
+}
+
 .lista-status__rotulo {
   font-weight: 500;
 }

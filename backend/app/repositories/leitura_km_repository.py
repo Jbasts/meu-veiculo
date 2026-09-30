@@ -45,8 +45,8 @@ class LeituraKmRepository:
         ).first()
 
     def conflitos(self, veiculo_id: int, quilometragem: int, data_leitura: date | None,
-                  digitada_em: date | None = None,
-                  ignorar_id: int | None = None) -> list[LeituraKm]:
+                  digitada_em: date | None = None, ignorar_id: int | None = None,
+                  ignorar_origem: tuple[str, int] | None = None) -> list[LeituraKm]:
         """Leituras válidas que contradizem (quilometragem, data_leitura).
 
         O hodômetro só anda para a frente: uma leitura de um dia anterior não
@@ -57,6 +57,9 @@ class LeituraKmRepository:
         foi gravada (criado_em). Ela só entra na comparação com datas a partir
         desse dia. Para conferir uma leitura sem data, passe data_leitura=None
         e digitada_em com o dia em que ela foi gravada.
+
+        ignorar_origem=("manutencao", 12): não compara com a leitura gerada
+        pelo próprio registro que está sendo editado.
         """
         gravada_em = cast(LeituraKm.criado_em, Date)
         if data_leitura is not None:
@@ -72,6 +75,10 @@ class LeituraKmRepository:
         condicoes = [LeituraKm.veiculo_id == veiculo_id, LeituraKm.anulada_em.is_(None), contradiz]
         if ignorar_id is not None:
             condicoes.append(LeituraKm.id != ignorar_id)
+        if ignorar_origem is not None:
+            origem, origem_id = ignorar_origem
+            condicoes.append(or_(LeituraKm.origem != origem, LeituraKm.origem_id.is_(None),
+                                 LeituraKm.origem_id != origem_id))
         return list(self._sessao.scalars(
             select(LeituraKm).where(*condicoes)
             .order_by(LeituraKm.data_leitura.desc().nulls_last(), LeituraKm.id.desc()).limit(3)

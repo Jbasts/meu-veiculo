@@ -5,6 +5,7 @@ Os imports abaixo registram todas as tabelas mapeadas em Base.metadata
 """
 
 from app.entities.leitura_km import LeituraKm
+from app.entities.manutencao import Manutencao, ManutencaoItem, PlanoManutencao
 from app.entities.recuperacao_senha import RecuperacaoSenha
 from app.entities.sessao import Sessao
 from app.entities.tentativa_acesso import TentativaAcesso
@@ -12,5 +13,5 @@ from app.entities.usuario import Usuario
 from app.entities.veiculo import Veiculo
 from app.entities.veiculo_foto import VeiculoFoto
 
-__all__ = ["LeituraKm", "RecuperacaoSenha", "Sessao", "TentativaAcesso", "Usuario", "Veiculo",
-           "VeiculoFoto"]
+__all__ = ["LeituraKm", "Manutencao", "ManutencaoItem", "PlanoManutencao", "RecuperacaoSenha",
+           "Sessao", "TentativaAcesso", "Usuario", "Veiculo", "VeiculoFoto"]

@@ -13,9 +13,18 @@ export function urlDaFoto(veiculoId: number, fotoId: number): string {
   return `/api/veiculos/${veiculoId}/fotos/${fotoId}/arquivo`;
 }
 
-export function listarFotos(veiculoId: number, pagina = 1, porPagina = 30): Promise<Pagina<Foto>> {
+/** Filtro da galeria: todas, só as ligadas a manutenção ou só as sem vínculo. */
+export type VinculoFoto = "manutencao" | "nenhum";
+
+export function listarFotos(veiculoId: number, pagina = 1, porPagina = 30, filtro: {
+  vinculo?: VinculoFoto;
+  manutencaoId?: number;
+} = {}): Promise<Pagina<Foto>> {
+  let extra = "";
+  if (filtro.vinculo) extra += `&vinculo=${filtro.vinculo}`;
+  if (filtro.manutencaoId) extra += `&manutencao_id=${filtro.manutencaoId}`;
   return chamarApi<Pagina<Foto>>(
-    "GET", `/veiculos/${veiculoId}/fotos?pagina=${pagina}&por_pagina=${porPagina}`);
+    "GET", `/veiculos/${veiculoId}/fotos?pagina=${pagina}&por_pagina=${porPagina}${extra}`);
 }
 
 export function obterFoto(veiculoId: number, fotoId: number): Promise<Foto> {
@@ -27,20 +36,25 @@ export function enviarFoto(veiculoId: number, dados: {
   legenda: string;
   dataFoto: string;
   principal: boolean;
+  /** Manutenção do mesmo veículo à qual a foto fica ligada (opcional). */
+  manutencaoId?: number | null;
 }): Promise<Foto> {
   const formulario = new FormData();
   formulario.append("arquivo", dados.arquivo);
   if (dados.legenda.trim()) formulario.append("legenda", dados.legenda.trim());
   if (dados.dataFoto) formulario.append("data_foto", dados.dataFoto);
   formulario.append("principal", dados.principal ? "true" : "false");
+  if (dados.manutencaoId) formulario.append("manutencao_id", String(dados.manutencaoId));
   return chamarApi<Foto>("POST", `/veiculos/${veiculoId}/fotos`, formulario);
 }
 
+/** Atualiza legenda, data e vínculo. manutencaoId null = foto sem vínculo. */
 export function editarFoto(veiculoId: number, fotoId: number, legenda: string,
-  dataFoto: string): Promise<Foto> {
+  dataFoto: string, manutencaoId: number | null): Promise<Foto> {
   return chamarApi<Foto>("PUT", `/veiculos/${veiculoId}/fotos/${fotoId}`, {
     legenda: legenda.trim() || null,
     data_foto: dataFoto,
+    manutencao_id: manutencaoId,
   });
 }
 

@@ -20,6 +20,7 @@ from app.services.erros import (
     MuitasTentativas,
     NaoAutenticado,
     NaoEncontrado,
+    ServicoIndisponivel,
 )
 
 CODIGO_HTTP: dict[type[ErroDeNegocio], int] = {
@@ -29,6 +30,7 @@ CODIGO_HTTP: dict[type[ErroDeNegocio], int] = {
     NaoEncontrado: 404,
     Conflito: 409,
     MuitasTentativas: 429,
+    ServicoIndisponivel: 503,
 }
 
 MENSAGENS_DE_FORMATO = {

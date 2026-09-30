@@ -7,8 +7,8 @@ Status possíveis: **pendente**, **em andamento**, **entregue** (código pronto 
 | 0 | Análise dos anexos, escolha da plataforma e plano de etapas | validada |
 | 1 | Estrutura de pastas, banco, migrations e ambiente | validada |
 | 2 | Cadastro, login, recuperação de senha e permissões | validada |
-| 3 | Veículos, quilometragem e base das fotos (upload, capa e galeria) | entregue |
-| 4 | Manutenções e planos (inclui fotos ligadas a manutenção) | pendente |
+| 3 | Veículos, quilometragem e base das fotos (upload, capa e galeria) | validada |
+| 4 | Manutenções e planos (inclui fotos ligadas a manutenção) | entregue |
 | 5 | Diagnósticos (inclui fotos ligadas a diagnóstico) | pendente |
 | 6 | Gastos e finanças | pendente |
 | 7 | Abastecimentos e consumo | pendente |
@@ -90,5 +90,27 @@ A ordem pode ser ajustada na etapa 0 para respeitar dependências; registre o mo
   - Testar as telas no navegador do computador com fotos de verdade (inclusive uma foto grande do celular).
   - Câmera do celular, HEIC vindo de um iPhone real e acesso pela rede local: etapa 10. O HEIC foi testado só com arquivo gerado por programa.
 - Não coberto nesta etapa: listagem de todos os veículos para o admin (tela "Usuários e veículos", etapa 9; o acesso do admin por endereço direto já funciona e está testado); vínculo de foto com manutenção, diagnóstico e projeto e os filtros da galeria (etapas 4, 5 e 8); cartões de custo do "Meu veículo" e atalhos/alertas/indicadores do Início (etapas 4 a 9); miniaturas das fotos (a galeria carrega a imagem inteira, já reduzida a 2560 pontos).
+- Validado pela Paula (30/09/2026): instalou as bibliotecas, aplicou a 0003 no banco de desenvolvimento, usou as telas (a pasta `backend\storage\veiculos` foi criada pelo envio de foto), fez o commit e enviou ao GitHub. Ela não relatou problemas nem detalhou cada teste. Observação: o commit da etapa 3 ficou com a mensagem "Etapa 2 completa" (`20dd5a8`); o conteúdo é o da etapa 3.
 - Pendência de etapa anterior: envio real de e-mail por SMTP continua sem teste.
 - Pendências para a próxima etapa (4 — manutenções e planos): entities `PlanoManutencao` e `Manutencao`; chaves compostas para garantir plano e manutenção do mesmo veículo; base fixa (`data_base`/`km_base`) nos planos no lugar do `CURRENT_DATE` e do zero inventado da view; faixas de 1.000 km/30 dias; pendentes sem alerta duplicado; `garantia_km` como limite absoluto; fotos ligadas a manutenção; os triggers de km da 0003 já tratam status e edição, faltam os testes pela API.
+
+### Etapa 4 — Manutenções e planos (30/09/2026)
+- Ficou funcionando (código + testes do Claude):
+  - Migration 0004: base fixa dos planos (`data_base`/`km_base`), situação recalculada (`classificar_prazo`, faixas de 1.000 km/30 dias, "dados insuficientes" sem base), chaves compostas "mesmo veículo" para plano e fotos da manutenção.
+  - Planos, manutenções realizadas/agendadas, aba Pendentes (cada obrigação uma vez), garantia com limite do hodômetro, lembrete da próxima, fotos ligadas à manutenção.
+  - Migration 0005 (pedido da Paula): peças e mão de obra (`manutencao_item`), cada item com nome e valor; total = soma dos itens, garantido pelo banco (trigger + conferência adiada); sem itens, valor manual; manutenções antigas preservadas sem divisão inventada. Formulário com "+ Adicionar peça" / "+ Adicionar mão de obra", remover linha e prévia dos subtotais; popup "Ver valores" no detalhe e na aba Realizadas; agendada mostra valores estimados.
+  - Espaçamento: `.cartao.lista-status` com espaço interno (data, quilometragem... não encostam mais na borda).
+  - Proteção 503: com migration pendente, a API responde com a versão atual, a necessária e o comando `gerenciar.py migrar` (em vez de erro 500); `/api/saude` continua respondendo; aviso no terminal ao iniciar.
+- Incidente corrigido: as telas de planos e pendentes davam erro 500 ("coluna s.intervalo_km não existe") porque o banco de desenvolvimento estava na 0003 com o código já esperando a 0004. A 0004 estava correta e não foi alterada; foi aplicada com `gerenciar.py migrar` (backup `meu_veiculo_20260930_181208_antes_de_migrar.dump`). A proteção 503 impede que isso volte a aparecer como erro 500.
+- Arquivos criados/alterados: `backend/migrations/versions/{0004_manutencoes_e_planos, 0005_itens_da_manutencao}.py`; `backend/app/{main.py, dependencias.py}`; `backend/app/banco/versao.py`; `backend/app/entities/{manutencao, __init__}.py`; `backend/app/{repositories,services,controllers,routes,schemas}/manutencao_*.py`; `backend/app/services/erros.py`; `backend/app/controllers/erros_http.py`; `backend/app/routes/__init__.py`; `backend/tests/{test_manutencoes_api, test_manutencao_itens_api, test_migracao_0004, test_migracao_0005, test_banco_desatualizado, test_migracoes}.py`. `frontend/src/components/{ValoresManutencao, PecasManutencao}.tsx`; `pages/{Manutencao, ManutencaoForm, ManutencaoDetalhe, PlanoForm}Page.tsx` e `Manutencao.test.tsx`; `services/manutencaoService.ts`; `types/manutencao.ts`; `utils/formatos.ts` e `formatos.test.ts`; `styles/{manutencao, tema}.css`. `README.md` (seção 12 e problemas comuns), `docs/decisoes.md`, `docs/progresso.md`.
+- Testes executados pelo Claude:
+  - `.\.venv\Scripts\python.exe -m pytest` (backend, PostgreSQL de teste): 384 passaram, 0 falharam (inclui 12 da migration 0005 — banco vazio, banco já na 0004 preservando manutenções, desfazer/refazer, total diferente recusado pelo banco, centavos, itens inválidos, cascata —, 25 de peças e mão de obra pela API — criação, edição, remoção, subtotais, total, centavos, valor manual, total da tela recusado, agendada, isolamento entre usuários e veículos, admin, exclusão em cascata, veículo inativo — e 4 da proteção 503).
+  - `npm test` (frontend): 103 passaram, 0 falharam; `npm run build` (com `tsc`) ok.
+  - Fluxo real no Chrome (tela 412×915, automatizado) com uvicorn + Vite no banco de TESTE: 17 passos, todos ok (pendentes/planos sem 500, 5 itens adicionados um a um, remover linha, gravado 115,00 + 50,00 = 165,00, popup no detalhe, total "999.00" forçado direto na API recusado, edição, valor manual sem itens, popup na aba Realizadas, agendada estimada e concluída mantendo os itens, exclusão, outra conta com 404, espaçamento de 18px, aviso 503 com o banco na 0004 e volta ao normal depois do migrar). Log do backend sem erro 500, sem traceback e sem senha ou token. As capturas mostraram o botão "Ver valores" encostando no cartão; corrigido e conferido.
+  - Banco de desenvolvimento: 0004 e 0005 aplicadas com backup (`..._181208_...` e `..._190715_...`); consultas de planos e pendentes do veículo 2 executadas sem erro; a manutenção existente (R$ 230,00) ficou igual e sem itens; o fluxo de teste não gravou nada nele.
+- Depende de validação da Paula:
+  - Reiniciar o backend e usar as telas com os dados reais: nova manutenção com peças e mão de obra, editar, "Ver valores" no detalhe e na aba Realizadas, agendada.
+  - Conferir no terminal do PowerShell se o aviso de banco desatualizado aparece com acentos corretos (no log capturado pelo Claude os acentos saíram trocados por causa da codificação do arquivo de log; não foi possível ver o terminal dela).
+  - Celular (Android/Chrome): etapa 10.
+- Pendências para a próxima etapa (5 — diagnósticos): fotos ligadas a diagnóstico; manter o padrão "total calculado no backend" se diagnóstico tiver custo; envio real por SMTP continua sem teste.
+

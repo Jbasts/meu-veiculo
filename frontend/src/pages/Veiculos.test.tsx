@@ -38,6 +38,7 @@ const COM_CIVIC = {
   "GET /api/veiculos": () => json(200, [CIVIC]),
   "GET /api/veiculos/7": () => json(200, CIVIC),
   "GET /api/veiculos/7/fotos?pagina=1&por_pagina=3": () => pagina<Foto>([]),
+  "GET /api/veiculos/7/manutencoes/pendentes": () => json(200, { km_atual: 85000, itens: [] }),
 };
 
 function corpoDe(buscar: ReturnType<typeof apiFalsa>, chave: string) {
@@ -79,8 +80,10 @@ describe("Início e navegação", () => {
     expect(within(barra).getByRole("link", { name: "Início" })).toHaveAttribute("aria-current", "page");
 
     await userEvent.click(within(barra).getByRole("link", { name: "Manutenção" }));
+    expect(await screen.findByRole("tab", { name: "Pendentes" })).toBeInTheDocument();
+    await userEvent.click(within(barra).getByRole("link", { name: "Diagnóstico" }));
     expect(await screen.findByText("Ainda não disponível")).toBeInTheDocument();
-    expect(screen.getByText(/etapa 4/)).toBeInTheDocument();
+    expect(screen.getByText(/etapa 5/)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("link", { name: "Mais" }));
     expect(await screen.findByRole("heading", { name: "Mais" })).toBeInTheDocument();

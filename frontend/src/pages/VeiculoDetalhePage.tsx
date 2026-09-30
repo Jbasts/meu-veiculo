@@ -160,6 +160,10 @@ export default function VeiculoDetalhePage() {
         {totalFotos === 0 && !veiculo.ativo && <p className="texto-suave">Nenhuma foto.</p>}
       </div>
 
+      <Link to={`${base}/manutencoes`} className="botao botao--secundario botao--abaixo">
+        Manutenções e planos deste veículo
+      </Link>
+
       <h2 className="titulo-secao">Dados</h2>
       <ul className="cartao lista-status">
         <Linha rotulo="Marca" valor={veiculo.marca} />

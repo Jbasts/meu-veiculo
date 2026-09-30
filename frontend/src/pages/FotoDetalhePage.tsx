@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { useNavigate, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 
 import Alerta from "../components/Alerta";
 import BotaoEnviar from "../components/BotaoEnviar";
@@ -100,7 +100,8 @@ export default function FotoDetalhePage() {
       return;
     }
     await enviar(async () => {
-      mostrar(await editarFoto(veiculo!.id, foto!.id, legenda, data));
+      // O vínculo com a manutenção é mantido: aqui só mudam legenda e data.
+      mostrar(await editarFoto(veiculo!.id, foto!.id, legenda, data, foto!.manutencao_id));
       setSucesso("Alterações salvas.");
     });
   }
@@ -119,6 +120,23 @@ export default function FotoDetalhePage() {
       <p className="texto-suave">
         {formatarDataIso(foto.data_foto)} · {formatarTamanho(foto.tamanho_bytes)}
       </p>
+      {foto.manutencao_id !== null && (
+        <p className="foto-vinculo">
+          <span className="texto-suave">Ligada a uma manutenção. </span>
+          <Link to={`/veiculos/${veiculo.id}/manutencoes/${foto.manutencao_id}`} className="link">
+            Ver manutenção
+          </Link>
+          {veiculo.ativo && (
+            <button type="button" className="botao-link" disabled={ocupado}
+              onClick={() => void executar(async () => {
+                mostrar(await editarFoto(veiculo.id, foto.id, foto.legenda ?? "", foto.data_foto, null));
+                setSucesso("A foto não está mais ligada à manutenção.");
+              })}>
+              Desligar
+            </button>
+          )}
+        </p>
+      )}
 
       {veiculo.ativo ? (
         <>

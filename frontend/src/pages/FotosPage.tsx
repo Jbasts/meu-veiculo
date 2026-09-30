@@ -8,11 +8,17 @@ import { FotoProtegida } from "../components/PecasVeiculo";
 import TopoComVoltar from "../components/TopoComVoltar";
 import { useVeiculoDaRota } from "../hooks/useVeiculoDaRota";
 import { ErroDaApi } from "../services/apiCliente";
-import { listarFotos } from "../services/fotoService";
+import { listarFotos, type VinculoFoto } from "../services/fotoService";
 import type { Foto } from "../types/veiculo";
 import { formatarDataIso, formatarMesAnoLongo } from "../utils/datas";
 
 const POR_PAGINA = 30;
+// Os filtros de projeto e diagnóstico entram com esses módulos (etapas 5 e 8).
+const FILTROS: { valor: "" | VinculoFoto; rotulo: string }[] = [
+  { valor: "", rotulo: "Todas" },
+  { valor: "manutencao", rotulo: "Manutenções" },
+  { valor: "nenhum", rotulo: "Sem vínculo" },
+];
 
 /** Agrupa por mês, mantendo a ordem recebida (mais recente primeiro). */
 function porMes(fotos: Foto[]): { mes: string; fotos: Foto[] }[] {
@@ -26,8 +32,7 @@ function porMes(fotos: Foto[]): { mes: string; fotos: Foto[] }[] {
   return grupos;
 }
 
-// Galeria do veículo (PDF, página 20). Os filtros por projeto, diagnóstico e
-// manutenção aparecem quando esses vínculos existirem (etapas 4, 5 e 8).
+// Galeria do veículo (PDF, página 20), com filtro pelo tipo de vínculo.
 export default function FotosPage() {
   const { id, veiculo, carregando, erro, recarregar } = useVeiculoDaRota();
   const local = useLocation();
@@ -37,11 +42,12 @@ export default function FotosPage() {
   const [pagina, setPagina] = useState(0);
   const [carregandoFotos, setCarregandoFotos] = useState(true);
   const [erroFotos, setErroFotos] = useState<string | null>(null);
+  const [filtro, setFiltro] = useState<"" | VinculoFoto>("");
 
   const carregar = useCallback(async (numero: number) => {
     setCarregandoFotos(true);
     try {
-      const resultado = await listarFotos(id, numero, POR_PAGINA);
+      const resultado = await listarFotos(id, numero, POR_PAGINA, { vinculo: filtro || undefined });
       setFotos((atuais) => (numero === 1 ? resultado.itens : [...atuais, ...resultado.itens]));
       setTotal(resultado.total);
       setPagina(numero);
@@ -51,7 +57,7 @@ export default function FotosPage() {
     } finally {
       setCarregandoFotos(false);
     }
-  }, [id]);
+  }, [id, filtro]);
 
   useEffect(() => {
     if (veiculo?.id) void carregar(1);
@@ -84,13 +90,24 @@ export default function FotosPage() {
       )}
       {carregandoFotos && fotos.length === 0 && <Carregando texto="Carregando fotos…" />}
 
+      <div className="opcoes opcoes--filtro" role="group" aria-label="Filtrar fotos">
+        {FILTROS.map(({ valor, rotulo }) => (
+          <button key={valor} type="button" aria-pressed={filtro === valor}
+            className={`opcao${filtro === valor ? " opcao--ativa" : ""}`}
+            onClick={() => setFiltro(valor)}>
+            {rotulo}
+          </button>
+        ))}
+      </div>
+
       {!carregandoFotos && !erroFotos && total === 0 && (
         <section className="cartao">
-          <p className="cartao__titulo">Nenhuma foto ainda</p>
+          <p className="cartao__titulo">{filtro ? "Nenhuma foto neste filtro" : "Nenhuma foto ainda"}</p>
           <p className="texto-suave">
-            {veiculo.ativo
-              ? "Toque no + para tirar uma foto ou escolher uma da galeria do aparelho."
-              : "Este veículo está inativo e não tem fotos."}
+            {filtro ? "Escolha \"Todas\" para ver a galeria inteira."
+              : veiculo.ativo
+                ? "Toque no + para tirar uma foto ou escolher uma da galeria do aparelho."
+                : "Este veículo está inativo e não tem fotos."}
           </p>
         </section>
       )}
@@ -105,6 +122,9 @@ export default function FotosPage() {
                 <FotoProtegida veiculoId={veiculo.id} fotoId={foto.id}
                   descricao={foto.legenda ?? `Foto de ${formatarDataIso(foto.data_foto)}`} />
                 {foto.principal && <span className="etiqueta-foto">Capa</span>}
+                {!foto.principal && foto.manutencao_id !== null && (
+                  <span className="etiqueta-foto etiqueta-foto--vinculo">Manutenção</span>
+                )}
               </Link>
             ))}
           </div>

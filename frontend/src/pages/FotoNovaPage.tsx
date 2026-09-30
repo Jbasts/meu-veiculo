@@ -5,21 +5,28 @@ import Alerta from "../components/Alerta";
 import BotaoEnviar from "../components/BotaoEnviar";
 import CampoTexto from "../components/CampoTexto";
 import { Carregando, ErroComNovaTentativa } from "../components/EstadoDaTela";
-import { Chave } from "../components/Formulario";
+import { CampoSelecao, Chave, GrupoOpcoes } from "../components/Formulario";
 import { IconeCamera, IconeImagem } from "../components/Icones";
 import TopoComVoltar from "../components/TopoComVoltar";
 import { useVeiculos } from "../contexts/VeiculosContext";
 import { useEnvioFormulario } from "../hooks/useEnvioFormulario";
 import { usePreviaDeArquivo } from "../hooks/usePreviaDeArquivo";
 import { useVeiculoDaRota } from "../hooks/useVeiculoDaRota";
+import { ErroDaApi } from "../services/apiCliente";
 import { enviarFoto, erroDoArquivo } from "../services/fotoService";
-import { hojeIso } from "../utils/datas";
+import { listarManutencoes } from "../services/manutencaoService";
+import type { Manutencao } from "../types/manutencao";
+import { formatarDataIso, hojeIso } from "../utils/datas";
 import { formatarTamanho } from "../utils/formatos";
 
 const TIPOS_ACEITOS = "image/jpeg,image/png,image/webp,image/heic,image/heif";
+// Diagnóstico e projeto entram como opções nas etapas 5 e 8.
+const VINCULOS: { valor: "nenhum" | "manutencao"; rotulo: string }[] = [
+  { valor: "nenhum", rotulo: "Nenhum" },
+  { valor: "manutencao", rotulo: "Manutenção" },
+];
 
-// "Nova foto" (PDF, página 21). "Ligar a um registro" (projeto, diagnóstico
-// ou manutenção) entra junto com esses módulos, nas etapas 4, 5 e 8.
+// "Nova foto" (PDF, página 21), com "Ligar a um registro" para manutenção.
 export default function FotoNovaPage() {
   const { veiculo, carregando, erro, recarregar } = useVeiculoDaRota();
   const { recarregar: recarregarLista } = useVeiculos();
@@ -32,11 +39,37 @@ export default function FotoNovaPage() {
   const [legenda, setLegenda] = useState("");
   const [data, setData] = useState(hoje);
   const [comoCapa, setComoCapa] = useState(parametros.get("capa") === "1");
+  // ?manutencao=ID: a tela foi aberta a partir de uma manutenção.
+  const manutencaoInicial = parametros.get("manutencao") ?? "";
+  const [ligar, setLigar] = useState<"nenhum" | "manutencao">(manutencaoInicial ? "manutencao" : "nenhum");
+  const [manutencaoId, setManutencaoId] = useState(manutencaoInicial);
+  const [manutencoes, setManutencoes] = useState<Manutencao[] | null>(null);
+  const [erroManutencoes, setErroManutencoes] = useState<string | null>(null);
   const entradaCamera = useRef<HTMLInputElement>(null);
   const entradaGaleria = useRef<HTMLInputElement>(null);
   const { enviando, erroGeral, errosCampo, setErrosCampo, enviar } = useEnvioFormulario();
 
   useEffect(() => setPreviaFalhou(false), [arquivo]);
+
+  // A lista de manutenções só é buscada quando a pessoa escolhe ligar a foto a uma.
+  const idVeiculo = veiculo?.id;
+  useEffect(() => {
+    if (ligar !== "manutencao" || !idVeiculo || manutencoes !== null) return;
+    let cancelado = false;
+    listarManutencoes(idVeiculo, { porPagina: 100 })
+      .then((pagina) => {
+        if (!cancelado) setManutencoes(pagina.itens);
+      })
+      .catch((falha) => {
+        if (!cancelado) {
+          setErroManutencoes(falha instanceof ErroDaApi ? falha.message
+            : "Não foi possível carregar as manutenções.");
+        }
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [ligar, idVeiculo, manutencoes]);
 
   if (carregando) {
     return <div className="pagina"><main className="conteudo conteudo--topo"><Carregando /></main></div>;
@@ -70,16 +103,20 @@ export default function FotoNovaPage() {
     if (problema) erros.arquivo = problema;
     if (!data) erros.data_foto = "Informe a data da foto.";
     else if (data > hoje) erros.data_foto = "A data da foto não pode ser no futuro.";
+    if (ligar === "manutencao" && !manutencaoId) erros.manutencao_id = "Escolha a manutenção.";
     if (Object.keys(erros).length || !arquivo) {
       setErrosCampo(erros);
       return;
     }
     const deuCerto = await enviar(async () => {
-      await enviarFoto(veiculo!.id, { arquivo, legenda, dataFoto: data, principal: comoCapa });
+      await enviarFoto(veiculo!.id, {
+        arquivo, legenda, dataFoto: data, principal: comoCapa,
+        manutencaoId: ligar === "manutencao" ? Number(manutencaoId) : null,
+      });
       if (comoCapa) await recarregarLista();
     });
     if (deuCerto) {
-      navegar(comoCapa ? base : `${base}/fotos`, {
+      navegar(manutencaoInicial ? `${base}/manutencoes/${manutencaoInicial}` : comoCapa ? base : `${base}/fotos`, {
         replace: true,
         state: { mensagem: comoCapa ? "Foto de capa atualizada." : "Foto adicionada." },
       });
@@ -89,7 +126,8 @@ export default function FotoNovaPage() {
   return (
     <div className="pagina">
       <main className="conteudo conteudo--topo">
-        <TopoComVoltar titulo="Nova foto" voltarPara={comoCapa ? base : `${base}/fotos`} />
+        <TopoComVoltar titulo="Nova foto" voltarPara={manutencaoInicial
+          ? `${base}/manutencoes/${manutencaoInicial}` : comoCapa ? base : `${base}/fotos`} />
         {!veiculo.ativo && (
           <Alerta tipo="erro">Este veículo está inativo e não aceita fotos novas.</Alerta>
         )}
@@ -141,6 +179,25 @@ export default function FotoNovaPage() {
           <CampoTexto rotulo="Data da foto" type="date" max={hoje} value={data}
             onChange={(e) => setData(e.target.value)} erro={errosCampo.data_foto}
             dica={data === hoje ? "Hoje. Toque para alterar." : undefined} />
+
+          <GrupoOpcoes rotulo="Ligar a um registro" opcoes={VINCULOS} valor={ligar}
+            aoMudar={setLigar} />
+          {ligar === "manutencao" && (
+            erroManutencoes ? <Alerta tipo="erro">{erroManutencoes}</Alerta>
+              : manutencoes === null ? <Carregando texto="Carregando manutenções…" />
+                : manutencoes.length === 0
+                  ? <p className="campo__dica">Este veículo ainda não tem manutenções registradas.</p>
+                  : (
+                    <CampoSelecao rotulo="Manutenção" value={manutencaoId}
+                      onChange={(e) => setManutencaoId(e.target.value)} erro={errosCampo.manutencao_id}
+                      opcoes={[
+                        { valor: "", rotulo: "Escolha…" },
+                        ...manutencoes.map((m) => ({
+                          valor: String(m.id), rotulo: `${m.descricao} (${formatarDataIso(m.data)})`,
+                        })),
+                      ]} />
+                  )
+          )}
 
           <Chave titulo="Usar como capa" ligada={comoCapa} aoMudar={setComoCapa}
             descricao="Substitui a foto de capa atual do veículo." />

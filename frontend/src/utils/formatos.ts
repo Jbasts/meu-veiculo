@@ -68,6 +68,20 @@ export function lerDinheiro(texto: string): string | null | undefined {
   return `${inteiros}.${(partes[2] ?? "").padEnd(2, "0")}`;
 }
 
+/**
+ * Soma valores no formato da API ("70.00") em centavos inteiros, sem ponto
+ * flutuante: ["0.10", "0.20"] -> "0.30". Só para mostrar na tela; o total que
+ * vale é o que o backend calcula.
+ */
+export function somarDinheiro(valores: string[]): string {
+  const centavos = valores.reduce((soma, valor) => {
+    const [inteiros, fracao = ""] = valor.split(".");
+    return soma + BigInt(inteiros || "0") * 100n + BigInt(fracao.padEnd(2, "0").slice(0, 2));
+  }, 0n);
+  const texto = centavos.toString().padStart(3, "0");
+  return `${texto.slice(0, -2)}.${texto.slice(-2)}`;
+}
+
 /** 2_500_000 -> "2,4 MB" */
 export function formatarTamanho(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;

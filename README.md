@@ -393,6 +393,10 @@ npm run typecheck
 | `Esta leitura não combina com o histórico` | a quilometragem informada contradiz outra leitura (dia anterior com km maior, ou dia posterior com km menor) | confira valor e data; se a leitura antiga é que está errada, use "Corrigir" no histórico (seção 11.2) |
 | `Envio grande demais` ou `Foto grande demais` | foto acima de 10 MB | reduza a resolução na câmera ou escolha outra foto |
 | Foto aparece como "Imagem indisponível" | o arquivo sumiu da pasta `backend\storage` | seção 11.5 |
+| Tela mostra `O banco de dados está na versão 0004 e o sistema precisa da 0005...` (HTTP 503) | o código foi atualizado com uma migration nova e o banco ainda não | `.\.venv\Scripts\python.exe gerenciar.py migrar` (pasta `backend`); não precisa reiniciar o backend (seção 12.5) |
+| `coluna ... não existe` (erro 500) no terminal do backend | mesma causa, em versão antiga do código sem o aviso 503 | `.\.venv\Scripts\python.exe gerenciar.py migrar` (pasta `backend`) |
+| `Com peças ou mão de obra detalhadas, o total é calculado automaticamente` | foi enviado um total junto com itens | normal: com itens, o total é a soma; tire os itens para informar só o total (seção 12.3) |
+| `A migration 0004 parou: ... está ligada ao plano ..., que é do veículo ...` | registro antigo ligado a plano ou manutenção de outro veículo | seção 12.6 |
 
 ## 9. Contas, senhas e permissões
 
@@ -598,3 +602,78 @@ Se a migration avisar `o km atual era X, mas há registro com Y km`, ela
 seguiu em frente: a quilometragem atual passou a ser a maior leitura. Confira
 na tela Quilometragem de onde veio cada leitura e corrija o registro errado,
 se houver.
+
+## 12. Manutenção
+
+### 12.1 Planos e pendências
+
+Um plano é o que se repete ("troca de óleo a cada 10.000 km ou 12 meses").
+Ao criar, informe quando foi feita pela última vez (ou use "a partir de hoje"):
+o prazo é contado dessa base e não anda sozinho com o calendário. A aba
+**Pendentes** mostra cada obrigação uma vez: atrasada, próxima (faltam até
+1.000 km ou 30 dias), em dia ou "dados insuficientes" (falta a base; o sistema
+não afirma que está em dia sem saber).
+
+### 12.2 Manutenções realizadas e agendadas
+
+- **Realizada**: aconteceu; se tiver quilometragem, vira leitura do hodômetro.
+- **Agendada**: ainda vai acontecer; não mexe na quilometragem, não tem
+  garantia e não entra nas despesas até ser marcada como realizada.
+- Garantia "até os 95.000 km" é o que o hodômetro vai marcar, não a distância.
+
+### 12.3 Peças e mão de obra
+
+No formulário da manutenção há duas áreas:
+
+- **Peças**: toque em **+ Adicionar peça** e informe nome e valor
+  (ex.: Filtro de óleo, 70,00). Repita para cada peça.
+- **Mão de obra**: toque em **+ Adicionar mão de obra** (ex.: Troca do filtro
+  de óleo, 20,00).
+
+Cada linha tem **Remover**. Os subtotais e o total aparecem na hora, só como
+prévia: quem calcula o total que fica gravado é o backend.
+
+Regras:
+
+- Com pelo menos um item, o total é **sempre** a soma dos itens. A tela não
+  envia total, e o backend recusa um total enviado junto com itens. O próprio
+  banco confere (migration 0005): um total diferente da soma nunca é gravado.
+- Sem nenhum item, aparece o campo **Valor total** para informar só o total
+  (ex.: lavagem, 50,00).
+- Manutenções antigas têm só o total. Nada é dividido por suposição; se quiser,
+  edite e detalhe os itens (o total passa a ser a soma deles).
+- Em manutenção agendada, os valores aparecem como estimados.
+- Apagar a manutenção apaga os itens dela.
+
+### 12.4 Ver valores
+
+No detalhe da manutenção, e em cada item da aba **Realizadas**, o botão
+**Ver valores** abre um quadro com cada peça e cada mão de obra com o seu
+valor, o total de peças, o total de mão de obra e o total da manutenção. Se a
+manutenção tem só o total, o quadro avisa que não há detalhamento.
+
+### 12.5 Aviso de banco desatualizado
+
+Quando o código recebe uma migration nova, o banco de desenvolvimento precisa
+de `gerenciar.py migrar`. Enquanto isso não acontece, a API responde a todas
+as telas com a mensagem "O banco de dados está na versão X e o sistema
+precisa da Y..." (HTTP 503), em vez de falhar no meio do uso. Ao iniciar, o
+backend também escreve esse aviso no terminal. A tela **Situação do sistema**
+continua funcionando e mostra as migrations pendentes.
+
+Na pasta `backend`:
+
+```powershell
+.\.venv\Scripts\python.exe gerenciar.py migrar
+```
+
+Não é preciso reiniciar o backend. Se você voltar o banco para uma versão
+anterior (restaurar um backup antigo) com o backend ligado, reinicie o backend.
+
+### 12.6 Se a migration 0004 parar por causa de vínculos entre veículos
+
+Ela lista, por exemplo: `manutenção 8 (veículo 2) está ligada ao plano 5, que
+é do veículo 3`. Nada foi alterado. Confira no pgAdmin qual vínculo está
+errado e corrija à mão (o plano certo, ou deixe a manutenção avulsa com
+`plano_id` vazio). Não apague registros sem conferir. Depois rode de novo
+`gerenciar.py migrar`.

@@ -1,7 +1,62 @@
 // Peças de formulário além do CampoTexto: grupo de opções (os botões em
 // "pílula" do PDF), chave liga/desliga e diálogo de confirmação.
 
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  type ReactNode,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
+} from "react";
+
+interface PropsSelecao extends Omit<SelectHTMLAttributes<HTMLSelectElement>, "id"> {
+  rotulo: string;
+  opcoes: { valor: string; rotulo: string }[];
+  erro?: string | null;
+  dica?: string;
+}
+
+/** Lista suspensa com rótulo, dica e erro (ex.: sistema, plano de manutenção). */
+export function CampoSelecao({ rotulo, opcoes, erro, dica, ...atributos }: PropsSelecao) {
+  const id = useId();
+  const idAjuda = `${id}-ajuda`;
+  return (
+    <div className="campo">
+      <label className="campo__rotulo" htmlFor={id}>{rotulo}</label>
+      <select id={id} className={`campo__entrada campo__selecao${erro ? " campo__entrada--erro" : ""}`}
+        aria-invalid={erro ? true : undefined} aria-describedby={erro || dica ? idAjuda : undefined}
+        {...atributos}>
+        {opcoes.map((opcao) => (
+          <option key={opcao.valor} value={opcao.valor}>{opcao.rotulo}</option>
+        ))}
+      </select>
+      {erro ? <p id={idAjuda} className="campo__erro" role="alert">{erro}</p>
+        : dica && <p id={idAjuda} className="campo__dica">{dica}</p>}
+    </div>
+  );
+}
+
+interface PropsArea extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "id"> {
+  rotulo: string;
+  erro?: string | null;
+}
+
+/** Campo de texto com várias linhas (ex.: observação). */
+export function CampoArea({ rotulo, erro, ...atributos }: PropsArea) {
+  const id = useId();
+  const idAjuda = `${id}-ajuda`;
+  return (
+    <div className="campo">
+      <label className="campo__rotulo" htmlFor={id}>{rotulo}</label>
+      <textarea id={id} rows={4}
+        className={`campo__entrada campo__area${erro ? " campo__entrada--erro" : ""}`}
+        aria-invalid={erro ? true : undefined} aria-describedby={erro ? idAjuda : undefined}
+        {...atributos} />
+      {erro && <p id={idAjuda} className="campo__erro" role="alert">{erro}</p>}
+    </div>
+  );
+}
 
 interface PropsOpcoes<T extends string> {
   rotulo: string;

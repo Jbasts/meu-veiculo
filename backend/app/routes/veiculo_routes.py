@@ -118,8 +118,10 @@ def anular_leitura(veiculo_id: Id, leitura_id: Id, dados: AnulacaoLeituraEntrada
 @router.get("/{veiculo_id}/fotos", response_model=PaginaFotos, responses=ERROS,
             summary="Galeria do veículo")
 def listar_fotos(veiculo_id: Id, atual: SessaoAtualDep, controller: FotoDep,
-                 pagina: Pagina = 1, por_pagina: PorPagina = 30):
-    return controller.listar(atual, veiculo_id, pagina, por_pagina)
+                 pagina: Pagina = 1, por_pagina: PorPagina = 30,
+                 vinculo: Annotated[str | None, Query(max_length=20)] = None,
+                 manutencao_id: Annotated[int | None, Query(ge=1, le=2_147_483_647)] = None):
+    return controller.listar(atual, veiculo_id, pagina, por_pagina, vinculo, manutencao_id)
 
 
 @router.post("/{veiculo_id}/fotos", response_model=FotoResposta, status_code=201,
@@ -130,8 +132,10 @@ def adicionar_foto(
     legenda: Annotated[str | None, Form(max_length=1000)] = None,
     data_foto: Annotated[date | None, Form()] = None,
     principal: Annotated[bool, Form()] = False,
+    manutencao_id: Annotated[int | None, Form(ge=1, le=2_147_483_647)] = None,
 ):
-    return controller.adicionar(atual, veiculo_id, arquivo, legenda, data_foto, principal)
+    return controller.adicionar(atual, veiculo_id, arquivo, legenda, data_foto, principal,
+                                manutencao_id)
 
 
 @router.delete("/{veiculo_id}/capa", status_code=204, responses=ERROS,

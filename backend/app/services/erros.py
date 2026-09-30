@@ -39,3 +39,7 @@ class Conflito(ErroDeNegocio):
 
 class MuitasTentativas(ErroDeNegocio):
     """Limite de tentativas atingido; tente mais tarde (HTTP 429)."""
+
+
+class ServicoIndisponivel(ErroDeNegocio):
+    """O sistema não pode atender agora, como banco desatualizado (HTTP 503)."""

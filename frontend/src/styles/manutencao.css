@@ -1,0 +1,413 @@
+/* Manutenção: abas, pendências, listas e campos extras (etapa 4).
+   As cores e medidas vêm das variáveis de tema.css. */
+
+/* ---------------------------------------------------------- cabeçalho e abas */
+
+.cabecalho-pagina {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.cabecalho-pagina .titulo-pagina {
+  margin-bottom: 2px;
+}
+
+.cabecalho-pagina__sub {
+  margin: 0;
+}
+
+.botao-redondo--grande {
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+}
+
+.abas {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 20px;
+  background: var(--cor-neutro-fundo);
+  border-radius: 16px;
+}
+
+.abas__item {
+  flex: 1;
+  min-height: 46px;
+  font-family: var(--fonte-texto);
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--cor-neutro-texto);
+  background: none;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.abas__item--ativa {
+  font-weight: 600;
+  color: var(--cor-texto);
+  background: var(--cor-cartao);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.abas__item:focus-visible,
+.botao-link:focus-visible {
+  outline: 3px solid var(--cor-destaque);
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------- pendências */
+
+.lista-pendencias,
+.lista-simples {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.pendencia {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.pendencia:last-child {
+  border-bottom: none;
+}
+
+.pendencia__principal {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--cor-texto);
+  text-decoration: none;
+}
+
+.pendencia__icone {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+}
+
+.pendencia__icone--alerta {
+  background: var(--cor-alerta-fundo);
+  color: var(--cor-alerta-texto);
+}
+
+.pendencia__icone--aviso {
+  background: var(--cor-aviso-fundo);
+  color: var(--cor-aviso-texto);
+}
+
+.pendencia__icone--ok {
+  background: var(--cor-ok-fundo);
+  color: var(--cor-ok-texto);
+}
+
+.pendencia__icone--neutro {
+  background: var(--cor-neutro-fundo);
+  color: var(--cor-neutro-texto);
+}
+
+.pendencia__texto,
+.lista-simples__texto {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pendencia__titulo,
+.lista-simples__titulo {
+  font-weight: 600;
+  font-size: 1.08rem;
+}
+
+.pendencia__descricao {
+  color: var(--cor-texto-suave);
+  font-size: 0.95rem;
+}
+
+.pendencia__prazo {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  font-size: 0.9rem;
+  color: var(--cor-texto-suave);
+}
+
+.pendencia__prazo strong {
+  font-size: 1.05rem;
+  color: var(--cor-texto);
+}
+
+.pendencia__prazo--alerta strong,
+.alerta-texto--alerta {
+  color: var(--cor-alerta-texto);
+}
+
+.pendencia__prazo--aviso strong,
+.alerta-texto--aviso {
+  color: var(--cor-aviso-texto);
+}
+
+.alerta-texto {
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.pendencia__barra {
+  height: 6px;
+  margin: 10px 0 0 58px;
+  background: var(--cor-neutro-fundo);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.pendencia__barra-cheia {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.pendencia__barra-cheia--alerta {
+  background: #b3261e;
+}
+
+.pendencia__barra-cheia--aviso {
+  background: var(--cor-destaque);
+}
+
+.pendencia__barra-cheia--ok {
+  background: var(--cor-primaria);
+}
+
+.pendencia__barra-cheia--neutro {
+  background: #9aa7ab;
+}
+
+.pendencia__acoes {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 10px 0 0 58px;
+  font-size: 0.95rem;
+}
+
+.secao__dica--solta {
+  margin-top: 0;
+}
+
+/* ------------------------------------------------------------ listas simples */
+
+.lista-simples__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  color: var(--cor-texto);
+  text-decoration: none;
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.lista-simples li:last-child .lista-simples__item {
+  border-bottom: none;
+}
+
+.lista-simples__item strong,
+.lista-simples__item .selo {
+  flex-shrink: 0;
+}
+
+.cartao.lista-pendencias,
+.cartao.lista-simples {
+  padding: 0;
+}
+
+.lista-status__valor {
+  text-align: right;
+}
+
+.texto-com-linhas {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------------- campos */
+
+.campo__selecao {
+  appearance: none;
+  padding-right: 44px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233d4d52' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 22px;
+}
+
+.campo__area {
+  min-height: 110px;
+  resize: vertical;
+  line-height: 1.4;
+}
+
+.grupo-campos {
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.botao--abaixo {
+  margin-bottom: 22px;
+}
+
+.botao-link {
+  margin-left: 12px;
+  padding: 4px 0;
+  font-family: var(--fonte-texto);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--cor-alerta-texto);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* -------------------------------------------------------------------- fotos */
+
+.opcoes--filtro {
+  margin-bottom: 16px;
+}
+
+.etiqueta-foto--vinculo {
+  background: var(--cor-petroleo-medio);
+}
+
+.foto-vinculo {
+  margin: 0 0 16px;
+}
+
+/* ------------------------------------------------ peças e mão de obra */
+
+.itens {
+  margin-bottom: 18px;
+}
+
+.item-linha {
+  display: grid;
+  grid-template-columns: 1fr 120px;
+  gap: 0 12px;
+  align-items: start;
+  padding: 12px 14px 4px;
+  margin-bottom: 10px;
+  background: var(--cor-cartao);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-cartao);
+}
+
+.item-linha__remover {
+  grid-column: 1 / -1;
+  justify-self: end;
+  margin-bottom: 10px;
+}
+
+.botao--adicionar {
+  min-height: 48px;
+  font-size: 1.05rem;
+}
+
+/* O .lista-status zera a margem do cartão acima: o espaço fica aqui. */
+.acao-valores {
+  margin: 12px 0 18px;
+}
+
+.lista-simples__item:has(+ .lista-simples__acoes) {
+  border-bottom: none;
+  padding-bottom: 6px;
+}
+
+.lista-simples__acoes {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 16px 12px;
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.lista-simples li:last-child .lista-simples__acoes {
+  border-bottom: none;
+}
+
+/* ------------------------------------------------------ popup de valores */
+
+.valores {
+  max-height: 60vh;
+  margin-bottom: 16px;
+  overflow-y: auto;
+}
+
+.valores__descricao {
+  margin: -4px 0 12px;
+}
+
+.valores__secao {
+  margin-bottom: 14px;
+}
+
+.valores__titulo {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--cor-neutro-texto);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.valores__lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.valores .valores__linha {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.valores__linha > :last-child {
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.valores .valores__subtotal {
+  border-bottom: none;
+  font-weight: 600;
+}
+
+.valores .valores__total {
+  padding: 12px 14px;
+  font-size: 1.1rem;
+  background: var(--cor-ok-fundo);
+  border: none;
+  border-radius: var(--raio-botao);
+}
+
+.valores .valores__aviso,
+.valores .valores__vazio {
+  margin: 0 0 12px;
+}
