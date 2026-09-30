@@ -16,10 +16,13 @@ from app.banco.migracoes import (
     config_alembic,
     ler_estado,
     migrar,
+    versao_mais_recente,
 )
 from app.banco.sql_original import comparar_com_original
 from app.config import obter_configuracoes
 from tests.conftest import criar_com_sql_original_sem_controle
+
+TODAS = ["0001", "0002"]
 
 
 def tem_tabela(engine, nome: str) -> bool:
@@ -27,35 +30,47 @@ def tem_tabela(engine, nome: str) -> bool:
         return conexao.execute(text("SELECT to_regclass(:n) IS NOT NULL"), {"n": nome}).scalar()
 
 
-def test_banco_vazio_tem_a_0001_pendente(banco_vazio):
+def test_banco_vazio_tem_todas_as_migrations_pendentes(banco_vazio):
     estado = ler_estado(banco_vazio)
     assert estado.situacao == "vazio"
     assert estado.versao_atual is None
-    assert estado.pendentes == ["0001"]
+    assert estado.pendentes == TODAS
+    assert estado.pendentes[0] == "0001"
 
 
-def test_migrar_banco_vazio_aplica_0001_sem_backup(banco_vazio):
+def test_migrar_banco_vazio_aplica_tudo_sem_backup(banco_vazio):
     estado, backup = migrar(engine=banco_vazio, configurar_logs=False)
     assert backup is None  # banco vazio não tem o que salvar
     assert estado.situacao == "controlado"
-    assert estado.versao_atual == "0001"
+    assert estado.versao_atual == versao_mais_recente()
     assert estado.pendentes == []
     assert tem_tabela(banco_vazio, "public.usuario")
 
 
-def test_estrutura_apos_migrar_e_identica_ao_sql_original(banco_migrado):
-    with conectar_psycopg(banco_migrado.url.database) as conexao:
+def test_0001_cria_estrutura_identica_ao_sql_original(banco_vazio):
+    command.upgrade(config_alembic(banco_vazio, configurar_logs=False), "0001")
+    with conectar_psycopg(banco_vazio.url.database) as conexao:
         diferencas = comparar_com_original(conexao)
         conexao.rollback()
     assert diferencas.iguais, diferencas.descrever()
     # A comparação não deixa o esquema temporário para trás.
-    assert not tem_tabela(banco_migrado, "mv_referencia_original.usuario")
+    assert not tem_tabela(banco_vazio, "mv_referencia_original.usuario")
 
 
 def test_migrar_de_novo_nao_faz_nada(banco_migrado):
     estado, backup = migrar(engine=banco_migrado, configurar_logs=False)
     assert backup is None
-    assert estado.versao_atual == "0001"
+    assert estado.versao_atual == versao_mais_recente()
+    assert estado.pendentes == []
+
+
+def test_migrar_banco_com_dados_faz_backup_antes(banco_vazio, tmp_path):
+    command.upgrade(config_alembic(banco_vazio, configurar_logs=False), "0001")
+    cfg = obter_configuracoes().model_copy(update={"pasta_backups": tmp_path})
+    estado, backup = migrar(engine=banco_vazio, configurar_logs=False, cfg=cfg)
+    assert backup is not None and backup.parent == tmp_path
+    assert backup.read_bytes()[:5] == b"PGDMP"
+    assert "antes_de_migrar" in backup.name
     assert estado.pendentes == []
 
 
@@ -90,7 +105,7 @@ def test_adotar_banco_criado_com_sql_original_preserva_dados(banco_vazio):
     estado = adotar_banco_existente(engine=banco_vazio, configurar_logs=False)
     assert estado.situacao == "controlado"
     assert estado.versao_atual == "0001"
-    assert estado.pendentes == []
+    assert estado.pendentes == TODAS[1:]  # as migrations novas ficam para o "migrar"
     with banco_vazio.connect() as conexao:
         assert conexao.execute(text("SELECT nome FROM usuario")).scalar() == "Ana"
 

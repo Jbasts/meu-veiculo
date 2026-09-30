@@ -5,10 +5,10 @@ manutenções, diagnósticos, projetos de melhoria e fotos. É uma aplicação w
 responsiva e instalável (PWA), feita com React + TypeScript no frontend,
 FastAPI (Python) no backend e PostgreSQL no banco de dados.
 
-> **Estado atual: etapa 1 (estrutura do projeto).** Existe a base do backend
-> em camadas, as migrations do banco e uma tela "Situação do sistema". As
-> funcionalidades do aplicativo (login, veículos, manutenções...) entram nas
-> próximas etapas. Veja `docs/progresso.md`.
+> **Estado atual: etapa 2 (contas e permissões).** Já funcionam: criar conta,
+> entrar, sair, trocar senha, recuperar senha por link, limite de tentativas,
+> permissões de usuário/admin no backend e criação do primeiro admin. Veículos,
+> manutenções e o restante entram nas próximas etapas. Veja `docs/progresso.md`.
 
 ---
 
@@ -22,6 +22,8 @@ FastAPI (Python) no backend e PostgreSQL no banco de dados.
 6. [Iniciar o sistema no dia a dia](#6-iniciar-o-sistema-no-dia-a-dia)
 7. [Rodar os testes](#7-rodar-os-testes)
 8. [Problemas comuns](#8-problemas-comuns)
+9. [Contas, senhas e permissões](#9-contas-senhas-e-permissões)
+10. [E-mail (recuperação de senha)](#10-e-mail-recuperação-de-senha)
 
 ---
 
@@ -70,14 +72,16 @@ meu-veiculo/
     ├── package-lock.json        trava de todas as versões
     ├── vite.config.ts           servidor de desenvolvimento e proxy /api
     └── src/
-        ├── main.tsx, App.tsx    ponto de partida
+        ├── main.tsx, App.tsx    ponto de partida e endereços (rotas) das telas
         ├── pages/               telas inteiras (uma por endereço)
-        ├── components/          peças reaproveitáveis (cabeçalho, selo...)
+        ├── components/          peças reaproveitáveis (campos, botões, cabeçalho...)
+        ├── contexts/            dados compartilhados entre telas (usuário logado)
+        ├── hooks/               lógica reaproveitável (envio de formulário)
         ├── services/            chamadas à API
         ├── types/               formatos de dados (TypeScript)
-        ├── utils/               funções auxiliares (datas, dinheiro...)
+        ├── utils/               funções auxiliares (datas, validação...)
         ├── styles/              tema visual (cores do PDF)
-        └── tests/               configuração dos testes
+        └── tests/               configuração e apoio dos testes
 ```
 
 ## 3. Arquitetura
@@ -167,9 +171,11 @@ O frontend segue a organização comum de projetos React (não a do backend):
 
 | Pasta | O que vai nela |
 |---|---|
-| `pages/` | uma tela inteira por endereço (ex.: `SituacaoSistemaPage.tsx`; depois `LoginPage.tsx`, `InicioPage.tsx`...) |
-| `components/` | peças visuais reaproveitáveis (`CabecalhoMarca`, `SeloStatus`; depois botões, cartões, barra de navegação) |
-| `services/` | conversa com a API. `apiCliente.ts` é o único lugar que chama `fetch`. |
+| `pages/` | uma tela inteira por endereço (`LoginPage`, `CadastroPage`, `EsqueciSenhaPage`, `RedefinirSenhaPage`, `InicioPage`, `ContaPage`, `SituacaoSistemaPage`) |
+| `components/` | peças visuais reaproveitáveis (`CampoTexto`, `CampoSenha` com o olho, `BotaoEnviar`, `Alerta`, `TopoComVoltar`, `RotaProtegida`...) |
+| `contexts/` | `AuthContext`: quem está logado, para todas as telas. Fica só na memória da página (nada em `localStorage`). |
+| `hooks/` | `useEnvioFormulario`: "enviando", trava contra envio duplicado e erros da API por campo |
+| `services/` | conversa com a API. `apiCliente.ts` é o único lugar que chama `fetch` e envia o cabeçalho `X-MV-Requisicao`. |
 | `types/` | formatos dos dados, iguais aos schemas do backend |
 | `utils/` | funções auxiliares. `datas.ts` formata datas **sem** `new Date()`, para não voltar um dia por causa do fuso. |
 | `styles/` | tema com as cores do PDF (verde-petróleo, fundo claro, cartões) |
@@ -332,9 +338,10 @@ cd C:\Users\j0n4s\OneDrive\Documentos\meu-veiculo\frontend
 npm run dev
 ```
 
-Esperado: `Local: http://localhost:5173/`. Abra esse endereço no navegador. A
-tela "Situação do sistema" deve mostrar API "No ar", Banco "Conectado",
-Migrations "Em dia (versão 0001)", o fuso e a data de hoje.
+Esperado: `Local: http://localhost:5173/`. Abra esse endereço no navegador: a
+tela "Entrar" aparece. Crie uma conta em "Criar conta" e você vai para o
+Início. A tela http://localhost:5173/situacao mostra API "No ar", Banco
+"Conectado", Migrations "Em dia" com a versão mais recente, o fuso e a data.
 
 Para parar: `Ctrl + C` em cada terminal.
 
@@ -372,3 +379,112 @@ npm run typecheck
 | `O arquivo ... meu_veiculo_banco.sql foi alterado` | alguém editou o SQL original | `git checkout -- database/original/meu_veiculo_banco.sql` |
 | Tela mostra API "Sem resposta" | backend não está rodando | Terminal 1 da seção 6 |
 | `EPERM`, arquivos travados ou lentidão no `npm` | a pasta está dentro do OneDrive, que sincroniza `node_modules` e `.venv` | pause a sincronização do OneDrive enquanto trabalha ou mova o projeto para `C:\projetos\meu-veiculo` |
+| `A migration 0002 parou: há e-mails incompatíveis` | dois cadastros antigos com o mesmo e-mail, diferentes só em maiúsculas ou espaços, ou e-mail sem `@` | seção 9.5 |
+| `Muitas tentativas de entrada` (tela Entrar) | 5 senhas erradas para o mesmo e-mail em 15 minutos | espere 15 minutos ou use "Esqueci minha senha" |
+| `Requisição recusada: ela não veio do aplicativo` | chamada à API sem o cabeçalho do app (ex.: pelo `/docs`) | normal para gravações fora do app; use as telas |
+| Tela Situação: "Pendente: 0002" | o banco de desenvolvimento ainda não recebeu a migration nova | `.\.venv\Scripts\python.exe gerenciar.py migrar` (pasta `backend`) |
+
+## 9. Contas, senhas e permissões
+
+### 9.1 Como funciona
+
+| Item | Regra |
+|---|---|
+| Cadastro | nome, e-mail, senha e confirmação. A conta nasce com perfil **padrão**. Um campo a mais (como `"perfil": "admin"`) faz o pedido ser recusado. |
+| E-mail | guardado sem espaços nas pontas e em minúsculas: ` Paula@Email.com ` e `paula@email.com` são o mesmo. O banco recusa outra grafia (restrição da migration 0002). |
+| Senha | de 8 a 128 caracteres, qualquer caractere; não pode ser só espaços, igual ao e-mail ou uma das senhas mais usadas ("12345678", "senha123"...). Não exigimos maiúscula e símbolo: isso leva a senhas previsíveis como "Senha@123". Frases longas são mais fortes. |
+| Hash | **Argon2id** (RFC 9106, recomendado pela OWASP): 3 passadas, 64 MiB de memória, 4 linhas; sal aleatório por senha. A senha nunca é gravada nem devolvida. |
+| Sessão | ao entrar, o navegador recebe um cookie `HttpOnly` (o JavaScript não lê), `SameSite=Lax` e restrito a `/api`. O banco guarda só o SHA-256 do token. Dura 30 dias (`SESSAO_DIAS`). |
+| Sair | encerra a sessão deste aparelho no banco; o token deixa de valer mesmo que alguém o tenha copiado. |
+| Trocar senha | exige a senha atual; os outros aparelhos saem, este continua. |
+| Conta desativada | perde o acesso na próxima ação, mesmo com uma sessão aberta antes. |
+| Limite de tentativas | login: 5 erros por e-mail ou 20 por endereço de rede em 15 minutos. Recuperação: 3 pedidos por e-mail por hora (sem avisar, para não revelar a conta) ou 10 por endereço de rede (aviso "Muitos pedidos"). |
+| Requisições forjadas | toda gravação exige o cabeçalho `X-MV-Requisicao: 1`, que só o app envia. Outro site não consegue acrescentar esse cabeçalho. |
+
+### 9.2 Recuperação de senha
+
+1. Em "Esqueci minha senha", a pessoa informa o e-mail. A resposta é **sempre a mesma**, exista ou não a conta.
+2. Se a conta existe e está ativa, o sistema envia um link `http://localhost:5173/redefinir-senha#token=...`, válido por 60 minutos (`RECUPERACAO_MINUTOS`) e de **uso único**. Um link novo invalida os anteriores.
+3. O banco guarda só o hash do token. A parte depois do `#` não é enviada a nenhum servidor, e a tela a apaga do endereço assim que abre.
+4. Ao salvar a senha nova, o link é consumido e a senha trocada **na mesma transação**. Se dois pedidos chegarem juntos com o mesmo link, o banco faz um esperar o outro, e só o primeiro funciona (há teste automático disso).
+5. Depois da troca, **todas** as sessões da conta são encerradas, inclusive a do aparelho usado.
+
+### 9.3 Permissões no backend
+
+- As routes usam `SessaoAtualDep` (exige estar logado; senão 401) ou `AdminDep` (exige perfil admin; senão 403), de `app/dependencias.py`.
+- Esconder um botão na tela não protege nada: a verificação é sempre no backend.
+- Nas próximas etapas, cada service também confere a quem pertence cada veículo e registro, sem confiar em IDs enviados pela tela.
+
+### 9.4 Primeiro administrador
+
+Não existe senha fixa nem endereço da API para virar admin. O primeiro admin é
+criado assim:
+
+1. Crie a conta normalmente pela tela "Criar conta".
+2. Na pasta `meu-veiculo\backend`, rode:
+
+   ```powershell
+   .\.venv\Scripts\python.exe gerenciar.py promover-admin paula@email.com
+   ```
+
+   Resultado esperado: `A conta paula@email.com agora é administradora.`
+3. Saia e entre de novo (ou recarregue a página) para ver o perfil "Admin".
+
+Só quem tem a senha do banco (`backend\.env`) consegue rodar esse comando.
+
+O banco **não deixa ficar sem administrador ativo**: desativar, rebaixar ou
+apagar o último admin ativo é recusado por um trigger, inclusive quando duas
+pessoas tentam ao mesmo tempo.
+
+### 9.5 Se a migration 0002 parar por causa de e-mails antigos
+
+Ela lista, por exemplo: `ficariam iguais a 'ana@email.com': usuários 3 (ana@email.com), 7 ( Ana@email.com)`.
+Nada foi alterado. Decida qual cadastro manter e corrija o outro à mão, por
+exemplo no pgAdmin, trocando o e-mail do cadastro duplicado por um endereço
+diferente e verdadeiro. Não apague nem una contas sem conferir os veículos de
+cada uma. Depois rode de novo `gerenciar.py migrar`.
+
+## 10. E-mail (recuperação de senha)
+
+### 10.1 Desenvolvimento: modo "arquivo" (padrão, gratuito)
+
+Com `EMAIL_MODO=arquivo` (padrão), nenhum e-mail sai do computador: cada
+mensagem vira um arquivo `.eml` em `backend\emails_dev\`.
+
+Para testar:
+
+1. Em http://localhost:5173/esqueci-senha, informe o e-mail de uma conta.
+2. Abra a pasta `backend\emails_dev\` e o arquivo `.eml` mais recente, com o Outlook, o Thunderbird ou o VS Code.
+3. Copie o link inteiro (começa com `http://localhost:5173/redefinir-senha#token=`) e cole no navegador.
+
+A pasta `emails_dev` não vai para o Git: os arquivos contêm links válidos.
+
+### 10.2 Envio real: modo "smtp"
+
+No `backend\.env`:
+
+```
+EMAIL_MODO=smtp
+EMAIL_REMETENTE=Meu Veículo <seu-endereco@provedor.com>
+SMTP_HOST=smtp.provedor.com
+SMTP_PORTA=587
+SMTP_SEGURANCA=starttls
+SMTP_USUARIO=seu-endereco@provedor.com
+SMTP_SENHA=senha-de-app-do-provedor
+URL_FRONTEND=http://localhost:5173
+```
+
+- Gmail e Outlook exigem uma "senha de app" (criada nas configurações de segurança da conta), não a senha normal.
+- Porta 587 usa `starttls`; porta 465 usa `ssl`.
+- `URL_FRONTEND` precisa ser o endereço que a pessoa abre no navegador (no celular, será o IP do computador; etapa 10).
+- Reinicie o backend depois de mudar o `.env`.
+- Uma falha de envio aparece no terminal do backend só como `Falha ao enviar e-mail (tipo do erro)`, sem destinatário nem conteúdo. A tela mostra a mesma mensagem de sempre.
+
+**Situação de teste:** o envio real por SMTP tem código pronto, mas **não foi
+testado** com um provedor de verdade: depende da sua conta de e-mail. O modo
+"arquivo" foi testado de ponta a ponta.
+
+Alternativa local que imita um servidor SMTP: o programa gratuito **Mailpit**
+(https://mailpit.axllent.org). Com ele rodando, use `EMAIL_MODO=smtp`,
+`SMTP_HOST=localhost`, `SMTP_PORTA=1025`, `SMTP_SEGURANCA=nenhuma`, sem
+usuário e senha, e veja as mensagens em http://localhost:8025.

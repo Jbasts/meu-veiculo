@@ -55,8 +55,10 @@ def test_dominio_dinheiro_recusa_valor_negativo(conexao):
         )
 
 
-def test_email_unico_sem_diferenciar_maiusculas(conexao):
-    criar_usuario(conexao, "Paula@Email.com")
+def test_email_unico(conexao):
+    # Desde a 0002 o banco só aceita e-mail em minúsculas e sem espaços
+    # (tests/test_migracao_0002.py); o índice único do SQL original continua valendo.
+    criar_usuario(conexao, "paula@email.com")
     with pytest.raises(IntegrityError):
         criar_usuario(conexao, "paula@email.com")
 

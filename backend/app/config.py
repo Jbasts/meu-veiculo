@@ -5,6 +5,7 @@ Nada aqui é enviado ao frontend. Senhas ficam só no .env (que não vai para o 
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -21,6 +22,8 @@ class Configuracoes(BaseSettings):
         env_file=PASTA_BACKEND / ".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        # Linha vazia no .env (ex.: "EMAIL_PASTA=") usa o valor padrão.
+        env_ignore_empty=True,
     )
 
     db_host: str = "localhost"
@@ -39,6 +42,27 @@ class Configuracoes(BaseSettings):
 
     # Pasta onde os backups automáticos são gravados.
     pasta_backups: Path = PASTA_BACKEND / "backups"
+
+    # Endereço do frontend, usado nos links enviados por e-mail.
+    url_frontend: str = "http://localhost:5173"
+
+    # Sessão (cookie). COOKIE_SEGURO=true exige HTTPS; em http://localhost fica false.
+    cookie_seguro: bool = False
+    sessao_dias: int = Field(default=30, ge=1, le=365)
+
+    # Validade do link de recuperação de senha.
+    recuperacao_minutos: int = Field(default=60, ge=5, le=24 * 60)
+
+    # E-mail. "arquivo" grava cada mensagem em EMAIL_PASTA (desenvolvimento);
+    # "smtp" envia de verdade pelo servidor configurado abaixo.
+    email_modo: Literal["arquivo", "smtp"] = "arquivo"
+    email_pasta: Path = PASTA_BACKEND / "emails_dev"
+    email_remetente: str = "Meu Veículo <nao-responda@meuveiculo.local>"
+    smtp_host: str = ""
+    smtp_porta: int = 587
+    smtp_usuario: str = ""
+    smtp_senha: SecretStr = Field(default=SecretStr(""))
+    smtp_seguranca: Literal["starttls", "ssl", "nenhuma"] = "starttls"
 
 
 @lru_cache

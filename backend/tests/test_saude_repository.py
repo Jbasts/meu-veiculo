@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from app.banco.conexao import criar_engine
+from app.banco.migracoes import versao_mais_recente
 from app.banco.sessao import abrir_sessao
 from app.config import FUSO_HORARIO, obter_configuracoes
 from app.repositories.erros import BancoIndisponivel
@@ -20,7 +21,7 @@ def test_le_relogio_e_migracoes_do_banco(banco_migrado):
     assert relogio.fuso_horario == FUSO_HORARIO
     assert relogio.data_hoje == datetime.now(ZoneInfo(FUSO_HORARIO)).date()
     assert estado.situacao == "controlado"
-    assert estado.versao_atual == "0001"
+    assert estado.versao_atual == versao_mais_recente()
     assert estado.pendentes == ()
 
 
@@ -28,7 +29,8 @@ def test_banco_vazio_mostra_pendencia(banco_vazio):
     with abrir_sessao(banco_vazio) as sessao:
         estado = SaudeRepository(sessao).ler_estado_migracoes()
     assert estado.situacao == "vazio"
-    assert estado.pendentes == ("0001",)
+    assert estado.pendentes[0] == "0001"
+    assert estado.pendentes[-1] == versao_mais_recente()
 
 
 def test_banco_fora_vira_erro_simples_sem_detalhes():

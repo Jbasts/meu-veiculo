@@ -15,6 +15,9 @@ htmlcov/
 # Backups do banco (contêm dados reais)
 backend/backups/
 
+# E-mails gravados em modo "arquivo" (contêm links de recuperação de senha)
+backend/emails_dev/
+
 # Node / frontend
 node_modules/
 dist/

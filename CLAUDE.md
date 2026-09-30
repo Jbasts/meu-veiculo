@@ -54,7 +54,7 @@ meu-veiculo/
 │       ├── main.py, config.py, dependencias.py
 │       ├── routes/  controllers/  services/  repositories/
 │       ├── entities/  schemas/  banco/
-├── frontend/src/             # pages, components, services, types, utils, styles, tests
+├── frontend/src/             # pages, components, contexts, hooks, services, types, utils, styles, tests
 ├── database/original/        # SQL recebido (somente leitura)
 └── docs/                     # requisitos, telas, progresso, decisões
 ```
@@ -65,6 +65,7 @@ Fluxo: Route → Controller → Service → Repository → `banco/` → PostgreS
 
 - routes: só endpoints; controllers: requisição/resposta HTTP e tradução de erros; services: regras e transações (`UnidadeDeTrabalho`), sem FastAPI nem SQLAlchemy; repositories: todo o SQL; entities: classes SQLAlchemy das tabelas existentes (nunca `create_all`); schemas: JSON de entrada/saída (Pydantic); banco: conexão, sessão, migrations, backup.
 - `tests/test_arquitetura.py` impede imports que furem as camadas; `tests/test_entities.py` confere entities com o banco.
+- Rotas que exigem login usam `SessaoAtualDep`; só admin, `AdminDep` (`app/dependencias.py`). Toda gravação exige o cabeçalho `X-MV-Requisicao: 1` (o `apiCliente.ts` já envia). Erros de regra: classes de `services/erros.py`.
 - Frontend segue organização React (pages, components, services, types), não as camadas do backend.
 
 ## Comandos do projeto
@@ -75,6 +76,8 @@ PowerShell. No PowerShell, o `npm` exige `Set-ExecutionPolicy -Scope CurrentUser
 - Criar usuário e bancos (pasta `backend`, pede a senha do postgres): `.\.venv\Scripts\python.exe gerenciar.py criar-bancos`
 - Estado / aplicar migrations (pasta `backend`): `.\.venv\Scripts\python.exe gerenciar.py estado` / `... gerenciar.py migrar` (`--teste` para o banco de teste)
 - Banco já existente criado com o SQL original (pasta `backend`): `... gerenciar.py backup` e `... gerenciar.py adotar-banco-existente`
+- Primeiro administrador (pasta `backend`, conta já criada pela tela): `.\.venv\Scripts\python.exe gerenciar.py promover-admin EMAIL`
+- E-mails de desenvolvimento (modo arquivo): arquivos `.eml` em `backend\emails_dev\` (fora do Git)
 - Iniciar backend (pasta `backend`): `.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload` → http://127.0.0.1:8000/docs
 - Preparar frontend (pasta `frontend`): `npm ci`
 - Iniciar frontend (pasta `frontend`): `npm run dev` → http://localhost:5173

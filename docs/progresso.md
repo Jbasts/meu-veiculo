@@ -6,7 +6,7 @@ Status possíveis: **pendente**, **em andamento**, **entregue** (código pronto 
 |---|---|---|
 | 0 | Análise dos anexos, escolha da plataforma e plano de etapas | validada |
 | 1 | Estrutura de pastas, banco, migrations e ambiente | validada |
-| 2 | Cadastro, login, recuperação de senha e permissões | pendente |
+| 2 | Cadastro, login, recuperação de senha e permissões | validada |
 | 3 | Veículos, quilometragem e base das fotos (upload, capa e galeria) | pendente |
 | 4 | Manutenções e planos (inclui fotos ligadas a manutenção) | pendente |
 | 5 | Diagnósticos (inclui fotos ligadas a diagnóstico) | pendente |
@@ -53,3 +53,23 @@ A ordem pode ser ajustada na etapa 0 para respeitar dependências; registre o mo
 - Validado pela Paula no computador dela: preencheu `DB_SENHA`, rodou `criar-bancos` e `migrar`, 61 testes passando, backend com `/api/saude` 200 e frontend rodando. Não havia banco anterior criado com o SQL original, então o caminho `adotar-banco-existente` foi validado só pelos testes automáticos.
 - Não coberto nesta etapa: o backup automático antes de migrar um banco que já tem migrations só é exercitado quando existir a 0002 (a função de backup em si foi testada); acesso pelo celular (etapa 10); PWA instalável (depois do login).
 - Pendências para a próxima etapa (2 — cadastro, login, recuperação de senha e permissões): primeira migration nova (0002) com tabelas de sessão e de recuperação de senha e normalização/`trim` do e-mail (com verificação prévia de duplicatas); entity `Usuario`; definir Argon2id, cookie `httpOnly`, limite de tentativas e Mailpit para o e-mail local; rotas do frontend (React Router).
+
+### Etapa 2 — Cadastro, login, recuperação de senha e permissões (29/09/2026)
+- Ficou funcionando (código + testes do Claude):
+  - Migration 0002: e-mail normalizado com CHECK (lista colisões e para sem alterar nada), tabelas `sessao`, `recuperacao_senha` e `tentativa_acesso`, trigger que protege o último admin ativo (com trava para alterações simultâneas).
+  - Backend em camadas: entities `Usuario`, `Sessao`, `RecuperacaoSenha`, `TentativaAcesso`; repositories, `AutenticacaoService`, `SenhaService` (Argon2id + política), `UsuarioService`, `email_service` (modo arquivo/smtp), `AuthController`, `auth_routes` (`/api/auth/cadastro`, `entrar`, `sair`, `eu`, `alterar-senha`, `recuperar-senha`, `redefinir-senha`), `SessaoAtualDep`/`AdminDep`, proteção CSRF por cabeçalho, erros de formato em português.
+  - `gerenciar.py promover-admin EMAIL` (primeiro admin).
+  - Frontend: Entrar, Criar conta, Esqueci minha senha, Redefinir senha, Conta e senha, Início provisório, rotas protegidas, `AuthContext`, validação local + erros do servidor por campo, trava contra envio duplicado.
+- Arquivos criados/alterados: `backend/app/{config.py, dependencias.py, entities/*, repositories/*, services/*, controllers/*, routes/*, schemas/*, banco/migracoes.py}`, `backend/migrations/versions/0002_autenticacao.py`, `backend/gerenciar.py`, `backend/requirements.txt`, `backend/.env.example`, `backend/tests/*`; `frontend/src/{App.tsx, pages/*, components/*, contexts/*, hooks/*, services/*, types/usuario.ts, utils/validacao.ts, styles/tema.css, tests/*}`, `frontend/vite.config.ts`, `frontend/package*.json`; `.gitignore`, `README.md` (seções 9 e 10), `CLAUDE.md`, `docs/decisoes.md`, `docs/progresso.md`.
+- Testes executados pelo Claude:
+  - `.\.venv\Scripts\python.exe -m pytest` (backend): 134 passaram, 0 falharam (inclui link consumido por duas threads ao mesmo tempo, falha forçada que desfaz o consumo do link, duas desativações simultâneas do último admin, backup automático antes de migrar).
+  - `npm test` (frontend): 30 passaram, 0 falharam; `npm run typecheck` sem erros; `npm run build` ok.
+  - Fluxo real com uvicorn no banco de TESTE (17 passos: cadastro, sessão em dois "aparelhos", 409, 422 para `perfil`, 403 sem cabeçalho, recuperação com `.eml` gravado, redefinição, reuso recusado, sessões encerradas, senha antiga recusada, nova aceita, sair). Esse teste achou e permitiu corrigir o link quebrado no `.eml` (codificação quoted-printable → 8bit no modo arquivo). Log do servidor sem senha nem token.
+- Depende de validação da Paula:
+  - Rodar `gerenciar.py migrar` no banco de desenvolvimento (ele está na 0001; o `migrar` faz backup antes).
+  - Testar as telas no navegador do computador (criar conta, sair, entrar, trocar senha, recuperar pelo `.eml`, `promover-admin`).
+  - Envio real por SMTP (e Mailpit) não foi testado: depende da conta de e-mail dela.
+  - Celular (Android/Chrome) fica para a etapa 10.
+- Validado pela Paula no computador dela (30/09/2026): aplicou a 0002 no banco de desenvolvimento e testou as telas de conta; relatou que tudo funcionou. O pedido de recuperação gravou o `.eml` em `backend\emails_dev\` (modo arquivo, padrão), mas nenhum e-mail chegou à caixa de entrada, o que é o esperado nesse modo.
+- Pendência adiada a pedido da Paula: configurar e testar o envio real por SMTP (README, seção 10.2). O código existe, mas nunca foi testado com um provedor de verdade.
+- Pendências para a próxima etapa (3 — veículos, quilometragem e base das fotos): entity `Veiculo`, normalização de placa com detecção de colisões, tabela `leitura_km`, correção de km, verificação de propriedade em todo acesso (usando `SessaoAtualDep`), upload de fotos com validação de conteúdo, barra de navegação inferior.

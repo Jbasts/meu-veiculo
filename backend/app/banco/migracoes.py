@@ -21,7 +21,7 @@ from sqlalchemy import Engine, text
 from app.banco.backup import fazer_backup
 from app.banco.conexao import conectar_psycopg, criar_engine
 from app.banco.sql_original import Diferencas, comparar_com_original
-from app.config import PASTA_BACKEND
+from app.config import PASTA_BACKEND, Configuracoes
 
 CAMINHO_ALEMBIC_INI = PASTA_BACKEND / "alembic.ini"
 REVISAO_SQL_ORIGINAL = "0001"
@@ -95,7 +95,8 @@ def ler_estado(engine: Engine) -> EstadoBanco:
 
 
 def migrar(nome_banco: str | None = None, *, engine: Engine | None = None,
-           backup: bool = True, configurar_logs: bool = True) -> tuple[EstadoBanco, Path | None]:
+           backup: bool = True, configurar_logs: bool = True,
+           cfg: Configuracoes | None = None) -> tuple[EstadoBanco, Path | None]:
     """Aplica as migrations pendentes. Devolve o estado final e o backup feito (se houve)."""
     engine = engine or criar_engine(nome_banco)
     estado = ler_estado(engine)
@@ -110,7 +111,7 @@ def migrar(nome_banco: str | None = None, *, engine: Engine | None = None,
         return estado, None
     arquivo_backup = None
     if backup and estado.situacao == "controlado":
-        arquivo_backup = fazer_backup(engine.url.database, motivo="antes_de_migrar")
+        arquivo_backup = fazer_backup(engine.url.database, motivo="antes_de_migrar", cfg=cfg)
     command.upgrade(config_alembic(engine, configurar_logs), "head")
     return ler_estado(engine), arquivo_backup
 

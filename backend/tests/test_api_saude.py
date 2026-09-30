@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.banco.conexao import criar_engine, obter_engine
+from app.banco.migracoes import versao_mais_recente
 from app.config import FUSO_HORARIO, obter_configuracoes
 from app.main import app
 
@@ -28,8 +29,8 @@ def test_saude_com_banco_migrado(banco_migrado, cliente_com):
     assert corpo["api"] == "ok"
     assert corpo["banco"] == "ok"
     assert corpo["situacao_banco"] == "controlado"
-    assert corpo["versao_migracao"] == "0001"
-    assert corpo["versao_mais_recente"] == "0001"
+    assert corpo["versao_migracao"] == versao_mais_recente()
+    assert corpo["versao_mais_recente"] == versao_mais_recente()
     assert corpo["migracoes_pendentes"] == []
     assert corpo["fuso_horario"] == FUSO_HORARIO
     assert date.fromisoformat(corpo["data_hoje"]) == datetime.now(ZoneInfo(FUSO_HORARIO)).date()
@@ -39,7 +40,8 @@ def test_saude_avisa_migration_pendente(banco_vazio, cliente_com):
     corpo = cliente_com(banco_vazio).get("/api/saude").json()
     assert corpo["banco"] == "ok"
     assert corpo["situacao_banco"] == "vazio"
-    assert corpo["migracoes_pendentes"] == ["0001"]
+    assert corpo["migracoes_pendentes"][0] == "0001"
+    assert corpo["migracoes_pendentes"][-1] == versao_mais_recente()
     assert "gerenciar.py migrar" in corpo["mensagem"]
 
 

@@ -11,7 +11,9 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: {
-      "/api": { target: "http://127.0.0.1:8000" },
+      // xfwd: repassa o endereço de quem acessou (X-Forwarded-For). O backend
+      // usa esse endereço no limite de tentativas de login.
+      "/api": { target: "http://127.0.0.1:8000", xfwd: true },
     },
   },
   test: {

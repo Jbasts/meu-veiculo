@@ -1,9 +1,15 @@
-import { render, screen } from "@testing-library/react";
+import { render as renderizar, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactElement } from "react";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Saude } from "../types/saude";
 import SituacaoSistemaPage from "./SituacaoSistemaPage";
+
+function render(elemento: ReactElement) {
+  return renderizar(<MemoryRouter>{elemento}</MemoryRouter>);
+}
 
 function saude(parcial: Partial<Saude>): Saude {
   return {

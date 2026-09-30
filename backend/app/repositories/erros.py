@@ -12,3 +12,7 @@ class ErroRepositorio(Exception):
 
 class BancoIndisponivel(ErroRepositorio):
     """Não foi possível falar com o PostgreSQL."""
+
+
+class EmailJaCadastrado(ErroRepositorio):
+    """O índice único usuario_email_unico recusou o e-mail."""

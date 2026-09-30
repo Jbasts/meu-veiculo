@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router";
 
 import CabecalhoMarca from "../components/CabecalhoMarca";
 import SeloStatus, { type TomStatus } from "../components/SeloStatus";
@@ -122,8 +123,10 @@ export default function SituacaoSistemaPage() {
           {carregando ? "Verificando…" : "Verificar novamente"}
         </button>
 
-        <p className="texto-suave rodape">
-          Etapa 1: estrutura do projeto. As telas do aplicativo chegam nas próximas etapas.
+        <p className="rodape-link">
+          <Link to="/" className="link">
+            Ir para o início
+          </Link>
         </p>
       </main>
     </div>

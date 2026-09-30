@@ -13,6 +13,8 @@ Comandos:
     adotar-banco-existente   registra um banco criado com o SQL original,
                              sem rodar o script de novo
     backup                   grava uma cópia do banco na pasta backend/backups
+    promover-admin EMAIL     torna administradora uma conta já cadastrada
+                             (é o único jeito de criar o primeiro admin)
 
 Use --teste para agir no banco de teste em vez do de desenvolvimento.
 """
@@ -29,8 +31,12 @@ from psycopg import sql
 from app.banco.backup import BackupFalhou, fazer_backup
 from app.banco.conexao import criar_engine
 from app.banco.migracoes import ErroMigracao, adotar_banco_existente, ler_estado, migrar
+from app.banco.sessao import UnidadeDeTrabalho, abrir_sessao
 from app.banco.sql_original import SqlOriginalAlterado
 from app.config import FUSO_HORARIO, obter_configuracoes
+from app.repositories.usuario_repository import UsuarioRepository
+from app.services.erros import ErroDeNegocio
+from app.services.usuario_service import UsuarioService
 
 DESCRICAO_SITUACAO = {
     "vazio": "vazio (nenhuma tabela)",
@@ -156,6 +162,21 @@ def cmd_backup(args: argparse.Namespace) -> None:
     print(f"Backup gravado em: {arquivo}")
 
 
+def cmd_promover_admin(args: argparse.Namespace) -> None:
+    exigir_senha_da_aplicacao()
+    engine = criar_engine(nome_do_banco(args))
+    try:
+        with abrir_sessao(engine) as sessao:
+            service = UsuarioService(UnidadeDeTrabalho(sessao), UsuarioRepository(sessao))
+            promovida = service.promover_a_admin(args.email)
+    finally:
+        engine.dispose()
+    if promovida:
+        print(f"A conta {args.email.strip().lower()} agora é administradora.")
+    else:
+        print(f"A conta {args.email.strip().lower()} já era administradora. Nada mudou.")
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Comandos do banco do Meu Veículo.")
     sub = parser.add_subparsers(dest="comando", required=True)
@@ -165,17 +186,23 @@ def main(argv: list[str] | None = None) -> None:
         ("migrar", cmd_migrar, "aplica migrations pendentes"),
         ("adotar-banco-existente", cmd_adotar, "registra banco criado com o SQL original"),
         ("backup", cmd_backup, "grava cópia do banco em backend/backups"),
+        ("promover-admin", cmd_promover_admin, "torna administradora uma conta já cadastrada"),
     ):
         p = sub.add_parser(nome, help=ajuda)
         p.set_defaults(funcao=funcao)
         if nome != "criar-bancos":
             p.add_argument("--teste", action="store_true", help="usar o banco de teste")
+        if nome == "promover-admin":
+            p.add_argument("email", help="e-mail da conta (criada antes pela tela 'Criar conta')")
 
     args = parser.parse_args(argv)
     try:
         args.funcao(args)
     except (ErroMigracao, BackupFalhou, SqlOriginalAlterado) as erro:
         print(f"ERRO: {erro}", file=sys.stderr)
+        raise SystemExit(1)
+    except ErroDeNegocio as erro:
+        print(f"ERRO: {erro.mensagem}", file=sys.stderr)
         raise SystemExit(1)
     except (psycopg.OperationalError, sqlalchemy.exc.OperationalError):
         print("ERRO: não consegui conectar ao PostgreSQL. Confira se o serviço está rodando "
