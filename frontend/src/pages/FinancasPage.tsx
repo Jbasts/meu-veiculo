@@ -285,7 +285,8 @@ function destinoDoLancamento(veiculoId: number, l: Lancamento): string | null {
   if (l.tipo === "manutencao") return `/veiculos/${veiculoId}/manutencoes/${l.origem_id}`;
   if (l.tipo === "gasto") return `/veiculos/${veiculoId}/gastos/${l.origem_id}`;
   if (l.tipo === "abastecimento") return `/veiculos/${veiculoId}/abastecimentos/${l.origem_id}`;
-  return null; // item de projeto ganha tela na etapa 8
+  if (l.tipo === "projeto" && l.projeto_id !== null) return `/veiculos/${veiculoId}/projetos/${l.projeto_id}`;
+  return null;
 }
 
 function ItemLancamento({ veiculoId, lancamento: l }: { veiculoId: number; lancamento: Lancamento }) {

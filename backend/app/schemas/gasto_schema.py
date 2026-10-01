@@ -85,6 +85,7 @@ class LancamentoResposta(BaseModel):
 
     tipo: str        # manutencao | abastecimento | gasto | projeto
     origem_id: int   # id na tabela de origem (para abrir o detalhe)
+    projeto_id: int | None  # só nos itens de projeto: o projeto a abrir
     data: date
     categoria: str
     descricao: str | None

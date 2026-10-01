@@ -399,6 +399,8 @@ npm run typecheck
 | `gerenciar.py migrar` para na 0006 com uma lista de diagnósticos ou fotos | vínculos antigos entre veículos diferentes ou incoerentes | corrija os vínculos listados (seção 13.6); nada foi alterado |
 | `gerenciar.py migrar` para na 0007 com uma lista de gastos pendentes | gastos antigos pendentes sem vencimento | informe o vencimento ou marque como pago (seção 14.6); nada foi alterado |
 | `gerenciar.py migrar` para na 0008 com uma lista de abastecimentos | total gravado muito diferente de litros × preço | corrija litros, preço ou total (seção 15.6); nada foi alterado |
+| `gerenciar.py migrar` para na 0011 com uma lista de projetos ou fotos | projeto concluído sem data, data de conclusão em projeto aberto ou foto ligada a projeto de outro veículo | corrija os registros listados (seção 16.6); nada foi alterado |
+| "Este projeto está concluído. Reabra o projeto para alterar os gastos." | gastos só mudam com o projeto planejado ou em andamento | toque em **Reabrir projeto**, ajuste e conclua de novo (seção 16.2) |
 | `Com peças ou mão de obra detalhadas, o total é calculado automaticamente` | foi enviado um total junto com itens | normal: com itens, o total é a soma; tire os itens para informar só o total (seção 12.3) |
 | `A migration 0004 parou: ... está ligada ao plano ..., que é do veículo ...` | registro antigo ligado a plano ou manutenção de outro veículo | seção 12.6 |
 
@@ -965,3 +967,71 @@ Ela lista, por exemplo: `abastecimento 5 (veículo 2, 15/09/2026): 38.500 ×
 R$ 4.290 = R$ 165.17, mas o total gravado é R$ 16.52`. Nada foi alterado.
 Confira o cupom e corrija no pgAdmin os litros, o preço ou o `valor_total`
 desse abastecimento. Depois rode de novo `gerenciar.py migrar`.
+
+## 16. Projetos de melhoria
+
+Em **Mais → Projetos** (o menu mostra quantos estão em andamento).
+
+### 16.1 Criar um projeto
+
+Nome, descrição, categoria (exterior, interior, mecânica, som, outros),
+orçamento (opcional) e previsão (opcional). Ele começa **Planejado** ou, se
+já começou, **Em andamento**.
+
+### 16.2 Situações
+
+| Ação | De | Para |
+|---|---|---|
+| Iniciar projeto | planejado | em andamento |
+| Marcar como concluído (pede a data; padrão: hoje) | planejado ou em andamento | concluído |
+| Cancelar projeto | planejado ou em andamento | cancelado |
+| Reabrir projeto | concluído ou cancelado | em andamento (a data de conclusão é apagada) |
+
+- Os **gastos** só podem ser incluídos, editados ou apagados com o projeto
+  planejado ou em andamento. Para mexer num concluído ou cancelado, reabra.
+  Assim o total de um projeto encerrado não muda sem querer.
+- **Cancelar não apaga os gastos**: o que foi gasto continua nas Finanças.
+- **Apagar** o projeto apaga os gastos (saem das Finanças) e as fotos dele.
+  Se o projeto só não vai mais acontecer, prefira cancelar.
+- Reabrir mantém os gastos e as fotos, inclusive as de depois.
+
+### 16.3 Orçamento
+
+- Gasto = soma dos gastos do projeto (calculada pelo backend).
+- Percentual = gasto ÷ orçamento, arredondado meio para cima ("84% do
+  orçamento").
+- "Restam R$ 700,00" (em andamento), "R$ 50,00 abaixo" (concluído) ou
+  "R$ 150,00 acima do orçamento".
+- Sem orçamento: não há percentual nem "restam". Orçamento R$ 0,00: não há
+  percentual (sem divisão por zero) e todo gasto aparece como acima.
+
+### 16.4 Fotos de antes e depois
+
+- No detalhe, os quadros **Foto antes** / **Foto depois** abrem "Nova foto"
+  já ligada ao projeto. Em "Nova foto", também dá para escolher **Ligar a um
+  registro → Projeto** e o momento (Antes, Depois ou Outra).
+- Pode haver várias fotos de cada; o cartão e o detalhe mostram a primeira (a
+  mais antiga) e o detalhe lista as demais.
+- A foto de depois pode ser enviada a qualquer momento ("Ao concluir" é só uma
+  dica).
+- Antes/depois exigem projeto do mesmo veículo. Na galeria, o filtro
+  **Projetos** mostra essas fotos.
+
+### 16.5 Finanças
+
+Cada gasto do projeto entra uma vez nas Finanças, na categoria **Projetos**,
+pela data dele, inclusive de projeto cancelado. Tocar no lançamento abre o
+projeto.
+
+### 16.6 Se a migration 0011 parar por causa de projetos ou fotos antigas
+
+Ela lista, por exemplo:
+
+- `projeto 3 (veículo 2, "Insulfilm") está concluído e sem data de conclusão`
+  → no pgAdmin, informe a `data_conclusao` (a data real) ou mude o `status`;
+- `projeto 4 (veículo 2, "Som") tem data de conclusão, mas está em_andamento`
+  → apague a `data_conclusao` ou mude o `status` para `concluido`;
+- `foto 9 (veículo 3) está ligada ao projeto 4, que é do veículo 2` → corrija
+  o `projeto_id` da foto ou deixe vazio.
+
+Nada foi alterado. Depois rode de novo `gerenciar.py migrar`.

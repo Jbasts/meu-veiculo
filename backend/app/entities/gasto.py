@@ -58,3 +58,4 @@ class Despesa:
     categoria: str
     descricao: str | None
     valor: Decimal
+    projeto_id: int | None = None  # só nos itens de projeto (migration 0011)

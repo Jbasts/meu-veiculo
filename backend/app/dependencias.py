@@ -35,6 +35,7 @@ from app.controllers.diagnostico_controller import DiagnosticoController
 from app.controllers.foto_controller import FotoController
 from app.controllers.gasto_controller import GastoController
 from app.controllers.manutencao_controller import ManutencaoController
+from app.controllers.projeto_controller import ProjetoController
 from app.controllers.saude_controller import SaudeController
 from app.controllers.veiculo_controller import VeiculoController
 from app.entities.sessao import SessaoAtual
@@ -45,6 +46,7 @@ from app.repositories.foto_repository import FotoRepository
 from app.repositories.gasto_repository import FinancasRepository, GastoRepository
 from app.repositories.leitura_km_repository import LeituraKmRepository
 from app.repositories.manutencao_repository import ManutencaoRepository, PlanoRepository
+from app.repositories.projeto_repository import ProjetoRepository
 from app.repositories.recuperacao_senha_repository import RecuperacaoSenhaRepository
 from app.repositories.saude_repository import SaudeRepository
 from app.repositories.sessao_repository import SessaoRepository
@@ -59,6 +61,7 @@ from app.services.erros import AcessoNegado, ServicoIndisponivel
 from app.services.foto_service import FotoService
 from app.services.gasto_service import FinancasService, GastoService
 from app.services.manutencao_service import ManutencaoService, PlanoService
+from app.services.projeto_service import ProjetoService
 from app.services.quilometragem_service import QuilometragemService
 from app.services.saude_service import SaudeService
 from app.services.senha_service import SenhaService
@@ -141,8 +144,16 @@ def obter_foto_controller(
 ) -> FotoController:
     return FotoController(FotoService(
         UnidadeDeTrabalho(sessao), VeiculoRepository(sessao), FotoRepository(sessao), arquivos,
-        ManutencaoRepository(sessao), DiagnosticoRepository(sessao),
+        ManutencaoRepository(sessao), DiagnosticoRepository(sessao), ProjetoRepository(sessao),
     ))
+
+
+def obter_projeto_controller(
+    sessao: SessaoDep,
+    arquivos: Annotated[ArquivoFotoRepository, Depends(obter_arquivos_de_foto)],
+) -> ProjetoController:
+    return ProjetoController(ProjetoService(
+        UnidadeDeTrabalho(sessao), VeiculoRepository(sessao), ProjetoRepository(sessao), arquivos))
 
 
 def _manutencao_service(sessao: Session, uow: UnidadeDeTrabalho, veiculos: VeiculoRepository,

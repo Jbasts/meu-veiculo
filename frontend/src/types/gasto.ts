@@ -90,4 +90,6 @@ export interface Lancamento {
   categoria: string;
   descricao: string | null;
   valor: string;
+  /** Só nos itens de projeto: o projeto a abrir. */
+  projeto_id: number | null;
 }

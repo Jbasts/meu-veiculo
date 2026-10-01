@@ -14,17 +14,22 @@ export function urlDaFoto(veiculoId: number, fotoId: number): string {
 }
 
 /** Filtro da galeria: só as ligadas a manutenção, a diagnóstico ou sem vínculo. */
-export type VinculoFoto = "manutencao" | "diagnostico" | "nenhum";
+export type VinculoFoto = "manutencao" | "diagnostico" | "projeto" | "nenhum";
+export type Momento = "antes" | "depois";
 
 export function listarFotos(veiculoId: number, pagina = 1, porPagina = 30, filtro: {
   vinculo?: VinculoFoto;
   manutencaoId?: number;
   diagnosticoId?: number;
+  projetoId?: number;
+  momento?: Momento;
 } = {}): Promise<Pagina<Foto>> {
   let extra = "";
   if (filtro.vinculo) extra += `&vinculo=${filtro.vinculo}`;
   if (filtro.manutencaoId) extra += `&manutencao_id=${filtro.manutencaoId}`;
   if (filtro.diagnosticoId) extra += `&diagnostico_id=${filtro.diagnosticoId}`;
+  if (filtro.projetoId) extra += `&projeto_id=${filtro.projetoId}`;
+  if (filtro.momento) extra += `&momento=${filtro.momento}`;
   return chamarApi<Pagina<Foto>>(
     "GET", `/veiculos/${veiculoId}/fotos?pagina=${pagina}&por_pagina=${porPagina}${extra}`);
 }
@@ -41,6 +46,9 @@ export function enviarFoto(veiculoId: number, dados: {
   /** Manutenção OU diagnóstico do mesmo veículo aos quais a foto fica ligada (opcional). */
   manutencaoId?: number | null;
   diagnosticoId?: number | null;
+  /** Projeto do mesmo veículo; momento (antes/depois) só com projeto. */
+  projetoId?: number | null;
+  momento?: Momento | null;
 }): Promise<Foto> {
   const formulario = new FormData();
   formulario.append("arquivo", dados.arquivo);
@@ -49,17 +57,22 @@ export function enviarFoto(veiculoId: number, dados: {
   formulario.append("principal", dados.principal ? "true" : "false");
   if (dados.manutencaoId) formulario.append("manutencao_id", String(dados.manutencaoId));
   if (dados.diagnosticoId) formulario.append("diagnostico_id", String(dados.diagnosticoId));
+  if (dados.projetoId) formulario.append("projeto_id", String(dados.projetoId));
+  if (dados.projetoId && dados.momento) formulario.append("momento", dados.momento);
   return chamarApi<Foto>("POST", `/veiculos/${veiculoId}/fotos`, formulario);
 }
 
 /** Atualiza legenda, data e vínculo. Os dois ids null = foto sem vínculo. */
 export function editarFoto(veiculoId: number, fotoId: number, legenda: string,
-  dataFoto: string, manutencaoId: number | null, diagnosticoId: number | null = null): Promise<Foto> {
+  dataFoto: string, manutencaoId: number | null, diagnosticoId: number | null = null,
+  projetoId: number | null = null, momento: string | null = null): Promise<Foto> {
   return chamarApi<Foto>("PUT", `/veiculos/${veiculoId}/fotos/${fotoId}`, {
     legenda: legenda.trim() || null,
     data_foto: dataFoto,
     manutencao_id: manutencaoId,
     diagnostico_id: diagnosticoId,
+    projeto_id: projetoId,
+    momento: projetoId ? momento : null,
   });
 }
 

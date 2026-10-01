@@ -576,7 +576,7 @@ def test_foto_nao_liga_a_dois_registros_nem_a_outro_veiculo(banco, paula, civic,
     feita = criar_manutencao(paula, civic["id"], hoje, quilometragem=None)
     dois = enviar_foto(paula, civic["id"], diagnostico_id=criado["id"],
                        manutencao_id=feita["id"])
-    assert dois.status_code == 422 and "não aos dois" in dois.json()["campos"]["diagnostico_id"]
+    assert dois.status_code == 422 and "um só registro" in dois.json()["campos"]["diagnostico_id"]
     moto = criar_veiculo(paula, placa="XYZ-9876", marca="Honda", modelo="CG")
     outro = enviar_foto(paula, moto["id"], diagnostico_id=criado["id"])
     assert outro.status_code == 422

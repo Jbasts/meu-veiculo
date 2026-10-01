@@ -14,20 +14,30 @@ import { usePreviaDeArquivo } from "../hooks/usePreviaDeArquivo";
 import { useVeiculoDaRota } from "../hooks/useVeiculoDaRota";
 import { ErroDaApi } from "../services/apiCliente";
 import { listarDiagnosticos } from "../services/diagnosticoService";
-import { enviarFoto, erroDoArquivo } from "../services/fotoService";
+import { enviarFoto, erroDoArquivo, type Momento } from "../services/fotoService";
 import { listarManutencoes } from "../services/manutencaoService";
+import { listarProjetos } from "../services/projetoService";
 import { formatarDataIso, hojeIso } from "../utils/datas";
 import { formatarTamanho } from "../utils/formatos";
 
 const TIPOS_ACEITOS = "image/jpeg,image/png,image/webp,image/heic,image/heif";
-type Vinculo = "nenhum" | "diagnostico" | "manutencao";
-// Projeto entra como opção na etapa 8.
+type Vinculo = "nenhum" | "projeto" | "diagnostico" | "manutencao";
 const VINCULOS: { valor: Vinculo; rotulo: string }[] = [
   { valor: "nenhum", rotulo: "Nenhum" },
+  { valor: "projeto", rotulo: "Projeto" },
   { valor: "diagnostico", rotulo: "Diagnóstico" },
   { valor: "manutencao", rotulo: "Manutenção" },
 ];
+type OpcaoMomento = "" | Momento;
+const MOMENTOS: { valor: OpcaoMomento; rotulo: string }[] = [
+  { valor: "antes", rotulo: "Antes" },
+  { valor: "depois", rotulo: "Depois" },
+  { valor: "", rotulo: "Outra" },
+];
 const TEXTOS_DO_VINCULO = {
+  projeto: { rotulo: "Projeto", carregando: "Carregando projetos…",
+    vazio: "Este veículo ainda não tem projetos.", escolha: "Escolha o projeto.",
+    erro: "Não foi possível carregar os projetos.", campo: "projeto_id", caminho: "projetos" },
   diagnostico: { rotulo: "Diagnóstico", carregando: "Carregando diagnósticos…",
     vazio: "Este veículo ainda não tem diagnósticos registrados.", escolha: "Escolha o diagnóstico.",
     erro: "Não foi possível carregar os diagnósticos.", campo: "diagnostico_id", caminho: "diagnosticos" },
@@ -41,7 +51,8 @@ interface Registro {
   rotulo: string;
 }
 
-// "Nova foto" (PDF, página 21), com "Ligar a um registro" (diagnóstico ou manutenção).
+// "Nova foto" (PDF, página 21), com "Ligar a um registro" (projeto, diagnóstico ou
+// manutenção). Foto de projeto pode ser de antes ou de depois.
 export default function FotoNovaPage() {
   const { veiculo, carregando, erro, recarregar } = useVeiculoDaRota();
   const { recarregar: recarregarLista } = useVeiculos();
@@ -54,9 +65,12 @@ export default function FotoNovaPage() {
   const [legenda, setLegenda] = useState("");
   const [data, setData] = useState(hoje);
   const [comoCapa, setComoCapa] = useState(parametros.get("capa") === "1");
-  // ?manutencao=ID ou ?diagnostico=ID: a tela foi aberta a partir desse registro.
-  const origem: Vinculo = parametros.get("diagnostico") ? "diagnostico"
+  // ?projeto=ID&momento=antes, ?diagnostico=ID ou ?manutencao=ID: a tela foi aberta a partir desse registro.
+  const origem: Vinculo = parametros.get("projeto") ? "projeto" : parametros.get("diagnostico") ? "diagnostico"
     : parametros.get("manutencao") ? "manutencao" : "nenhum";
+  const momentoPedido = parametros.get("momento");
+  const [momento, setMomento] = useState<OpcaoMomento>(
+    momentoPedido === "antes" || momentoPedido === "depois" ? momentoPedido : "");
   const idDeOrigem = origem === "nenhum" ? "" : parametros.get(origem) ?? "";
   const [ligar, setLigar] = useState<Vinculo>(origem);
   const [registroId, setRegistroId] = useState(idDeOrigem);
@@ -77,7 +91,10 @@ export default function FotoNovaPage() {
     const busca: Promise<Registro[]> = ligar === "manutencao"
       ? listarManutencoes(idVeiculo, { porPagina: 100 }).then((pagina) => pagina.itens.map((m) => ({
         id: m.id, rotulo: `${m.descricao} (${formatarDataIso(m.data)})` })))
-      : listarDiagnosticos(idVeiculo, "todos", 1, 100).then((pagina) => pagina.itens.map((d) => ({
+      : ligar === "projeto"
+        ? listarProjetos(idVeiculo, "todos", 1, 100).then((pagina) => pagina.itens.map((p) => ({
+          id: p.id, rotulo: p.nome })))
+        : listarDiagnosticos(idVeiculo, "todos", 1, 100).then((pagina) => pagina.itens.map((d) => ({
         id: d.id, rotulo: `${d.titulo} (${formatarDataIso(d.data_identificacao)})` })));
     setErroRegistros(null);
     busca
@@ -144,6 +161,8 @@ export default function FotoNovaPage() {
         arquivo, legenda, dataFoto: data, principal: comoCapa,
         manutencaoId: ligar === "manutencao" ? Number(registroId) : null,
         diagnosticoId: ligar === "diagnostico" ? Number(registroId) : null,
+        projetoId: ligar === "projeto" ? Number(registroId) : null,
+        momento: ligar === "projeto" && momento ? momento : null,
       });
       if (comoCapa) await recarregarLista();
     });
@@ -227,6 +246,11 @@ export default function FotoNovaPage() {
                         ...jaCarregados.map((r) => ({ valor: String(r.id), rotulo: r.rotulo })),
                       ]} />
                   )
+          )}
+
+          {ligar === "projeto" && (
+            <GrupoOpcoes rotulo="Momento" opcoes={MOMENTOS} valor={momento} aoMudar={setMomento}
+              erro={errosCampo.momento} />
           )}
 
           <Chave titulo="Usar como capa" ligada={comoCapa} aoMudar={setComoCapa}

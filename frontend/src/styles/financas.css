@@ -288,3 +288,181 @@
 .tipo__dica {
   margin: -8px 0 16px;
 }
+
+/* ---------------------------------------------------- projetos (PDF 16 e 19) */
+
+.opcoes--rolagem {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  margin-bottom: 16px;
+  padding-bottom: 2px;
+}
+
+.opcoes--rolagem .opcao {
+  flex-shrink: 0;
+}
+
+.lista-projetos {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+.projeto__link {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--cor-texto);
+  text-decoration: none;
+}
+
+.projeto__topo,
+.projeto__rodape {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+}
+
+.projeto__topo .selo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.projeto__nome {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1.55rem;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.projeto__valores {
+  color: var(--cor-texto-suave);
+}
+
+.projeto__valores strong {
+  color: var(--cor-texto);
+}
+
+.barra-orcamento {
+  display: block;
+  height: 8px;
+  margin: 8px 0 6px;
+  border-radius: 999px;
+  background: var(--cor-neutro-fundo);
+  overflow: hidden;
+}
+
+.barra-orcamento__cheia {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--cor-primaria);
+}
+
+.barra-orcamento__cheia--concluido {
+  background: #6a9aa3;
+}
+
+.barra-orcamento__cheia--alerta {
+  background: var(--cor-alerta-texto);
+}
+
+.antes-depois {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.antes-depois--grande {
+  margin: 0 0 18px;
+}
+
+.antes-depois__quadro {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.antes-depois__foto,
+.antes-depois__vazio {
+  position: relative;
+  display: flex;
+  aspect-ratio: 16 / 10;
+  border-radius: 14px;
+  overflow: hidden;
+  text-decoration: none;
+}
+
+.antes-depois--grande .antes-depois__foto,
+.antes-depois--grande .antes-depois__vazio {
+  aspect-ratio: 1;
+}
+
+.antes-depois__foto .foto {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.antes-depois__foto .etiqueta-foto {
+  top: 8px;
+  left: 8px;
+  right: auto;
+  bottom: auto;
+}
+
+.antes-depois__vazio {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--cor-primaria);
+  border: 2px dashed #8e9da2;
+}
+
+.antes-depois__vazio--sem-acao {
+  color: var(--cor-texto-suave);
+  font-weight: 500;
+}
+
+.antes-depois__dica {
+  font-size: 0.9rem;
+}
+
+.orcamento-projeto p {
+  margin: 0;
+}
+
+.orcamento-projeto__topo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.orcamento-projeto__gasto {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 2.2rem;
+}
+
+.lista-simples__botao {
+  width: 100%;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--cor-borda);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.acoes-texto--esquerda {
+  justify-content: flex-start;
+  margin: -8px 0 18px;
+}

@@ -24,7 +24,7 @@ SQL_TOTAIS_POR_CATEGORIA = text("""
 """)
 
 SQL_LANCAMENTOS = text("""
-    SELECT tipo, origem_id, data, categoria, descricao, valor
+    SELECT tipo, origem_id, data, categoria, descricao, valor, projeto_id
       FROM vw_despesa
      WHERE veiculo_id = :veiculo_id AND (CAST(:inicio AS date) IS NULL OR data >= :inicio) AND (CAST(:fim AS date) IS NULL OR data < :fim)
      ORDER BY data DESC, tipo, origem_id DESC

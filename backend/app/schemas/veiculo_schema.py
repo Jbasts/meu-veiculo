@@ -116,10 +116,12 @@ class PaginaLeituras(BaseModel):
 class FotoEdicaoEntrada(_Entrada):
     legenda: str | None = Field(default=None, max_length=1000)
     data_foto: date | None = None
-    # Manutenção OU diagnóstico do mesmo veículo aos quais a foto fica ligada;
-    # os dois vazios = sem vínculo.
+    # UM registro do mesmo veículo ao qual a foto fica ligada (todos vazios = sem
+    # vínculo); momento (antes/depois) só com projeto.
     manutencao_id: int | None = None
     diagnostico_id: int | None = None
+    projeto_id: int | None = None
+    momento: str | None = Field(default=None, max_length=10)
 
 
 class FotoResposta(BaseModel):

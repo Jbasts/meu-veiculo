@@ -39,9 +39,9 @@ const VAZIO: ResumoMes = {
 };
 
 const LANCAMENTOS: Lancamento[] = [
-  { tipo: "manutencao", origem_id: 12, data: HOJE, categoria: "manutencao", descricao: "Troca de óleo", valor: "350.00" },
-  { tipo: "abastecimento", origem_id: 3, data: HOJE, categoria: "combustivel", descricao: "Abastecimento, Shell", valor: "250.00" },
-  { tipo: "gasto", origem_id: 9, data: HOJE, categoria: "estacionamento", descricao: null, valor: "30.00" },
+  { tipo: "manutencao", origem_id: 12, data: HOJE, categoria: "manutencao", descricao: "Troca de óleo", valor: "350.00", projeto_id: null },
+  { tipo: "abastecimento", origem_id: 3, data: HOJE, categoria: "combustivel", descricao: "Abastecimento, Shell", valor: "250.00", projeto_id: null },
+  { tipo: "gasto", origem_id: 9, data: HOJE, categoria: "estacionamento", descricao: null, valor: "30.00", projeto_id: null },
 ];
 
 const SEGURO: Pendente = {
