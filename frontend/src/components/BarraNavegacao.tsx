@@ -18,10 +18,10 @@ export default function BarraNavegacao() {
     <nav className="barra" aria-label="Navegação principal">
       {ITENS.map(({ para, rotulo, Icone, prefixos }) => {
         // /veiculos/7/manutencoes e /veiculos/7/planos pertencem à aba Manutenção;
-        // /veiculos/7/diagnosticos, à aba Diagnóstico; /veiculos/7/financas e /gastos, a Finanças.
+        // /veiculos/7/diagnosticos, à aba Diagnóstico; /financas, /gastos e /abastecimentos, a Finanças.
         const deManutencao = /^\/veiculos\/\d+\/(manutencoes|planos)/.test(pathname);
         const deDiagnostico = /^\/veiculos\/\d+\/diagnosticos/.test(pathname);
-        const deFinancas = /^\/veiculos\/\d+\/(financas|gastos)/.test(pathname);
+        const deFinancas = /^\/veiculos\/\d+\/(financas|gastos|abastecimentos)/.test(pathname);
         const ativo = para === "/" ? pathname === "/"
           : para === "/manutencao" ? deManutencao || pathname.startsWith("/manutencao")
             : para === "/diagnostico" ? deDiagnostico || pathname.startsWith("/diagnostico")

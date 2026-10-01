@@ -398,6 +398,7 @@ npm run typecheck
 | Ao salvar a manutenção aparece "A data não pode ser anterior" | ela resolve um diagnóstico identificado depois dessa data | corrija a data da manutenção ou a do diagnóstico (seção 13.3) |
 | `gerenciar.py migrar` para na 0006 com uma lista de diagnósticos ou fotos | vínculos antigos entre veículos diferentes ou incoerentes | corrija os vínculos listados (seção 13.6); nada foi alterado |
 | `gerenciar.py migrar` para na 0007 com uma lista de gastos pendentes | gastos antigos pendentes sem vencimento | informe o vencimento ou marque como pago (seção 14.6); nada foi alterado |
+| `gerenciar.py migrar` para na 0008 com uma lista de abastecimentos | total gravado muito diferente de litros × preço | corrija litros, preço ou total (seção 15.6); nada foi alterado |
 | `Com peças ou mão de obra detalhadas, o total é calculado automaticamente` | foi enviado um total junto com itens | normal: com itens, o total é a soma; tire os itens para informar só o total (seção 12.3) |
 | `A migration 0004 parou: ... está ligada ao plano ..., que é do veículo ...` | registro antigo ligado a plano ou manutenção de outro veículo | seção 12.6 |
 
@@ -843,9 +844,8 @@ escolhido, com as mesmas regras (gasto pago pela data do pagamento, nada
 contado duas vezes). Não é possível ir além do mês ou do ano atual. As contas
 **Vencidas** e **A vencer** são sempre todas as pendentes, de qualquer período.
 
-- Tocar num lançamento abre a manutenção ou o gasto. Abastecimentos e itens
-  de projeto ganham tela nas etapas 7 e 8 (por enquanto aparecem sem link).
-- A aba **Combustível** chega na etapa 7.
+- Tocar num lançamento abre a manutenção, o gasto ou o abastecimento. Itens de
+  projeto ganham tela na etapa 8 (por enquanto aparecem sem link).
 
 ### 14.6 Se a migration 0007 parar por causa de gastos pendentes sem vencimento
 
@@ -853,3 +853,115 @@ Ela lista, por exemplo: `gasto 4 (veículo 2, seguro, R$ 2400.00, lançado em
 18/09/2026) está pendente e sem vencimento`. Nada foi alterado. No pgAdmin,
 informe a `data_vencimento` desse gasto ou, se ele já foi pago, marque
 `pago = true`. Depois rode de novo `gerenciar.py migrar`.
+
+## 15. Abastecimentos e consumo
+
+### 15.1 Registrar um abastecimento
+
+Em **Finanças → Combustível**, toque em **+**. Informe combustível, tipo,
+data, quilometragem, preço e quantidade.
+
+O que aparece depende do tipo do veículo (escolhido no cadastro dele):
+
+| Veículo | Combustíveis no abastecimento |
+|---|---|
+| Flex | gasolina, etanol |
+| Gasolina / Etanol / Diesel | só o próprio |
+| GNV | GNV, gasolina, etanol |
+| Híbrido | gasolina, eletricidade (recarga do plug-in) |
+| Elétrico | eletricidade (recarga) |
+
+Tipos e unidade de cada combustível:
+
+| Combustível | Tipos | Unidade |
+|---|---|---|
+| Gasolina | Comum; Comum aditivada; Premium; Premium aditivada | litro (L) |
+| Etanol | Comum (hidratado); Aditivado; Premium; Premium aditivado | litro (L) |
+| Diesel | S10; S10 aditivado; S500; S500 aditivado | litro (L) |
+| GNV | sem tipo | metro cúbico (m³) |
+| Eletricidade | Recarga AC; Recarga DC | kWh |
+
+Na eletricidade, "Tanque cheio" vira **Carga completa** (bateria a 100%).
+
+- A quilometragem é obrigatória e vira leitura do hodômetro (precisa combinar
+  com as outras). Abastecimentos antigos podem ser lançados depois.
+- **Tipo**: obrigatório (não aparece no GNV). Abastecimentos registrados
+  antes desse campo ficam "não informado"; ao editar, escolha se souber. Para
+  o consumo, os tipos do mesmo combustível contam juntos (gasolina comum e
+  premium são gasolina). Num híbrido, gasolina e recarga entre dois "cheios"
+  são mistura: aquele ciclo fica sem consumo.
+- Marque **Tanque cheio** quando encher o tanque: é assim que o consumo é
+  calculado. Parcial = deixe desligado.
+- **Recentes** mostra os postos usados por último.
+
+### 15.2 Valor total e cupom
+
+O total é calculado pelo backend: litros × preço, arredondado para centavos
+meio para cima. Exemplo: 38,5 L × R$ 4,29 = 165,165 → **R$ 165,17**. A tela
+mostra uma prévia, mas o valor gravado é o do backend.
+
+Se o cupom da bomba mostrar outro valor, toque em **Corrigir pelo cupom** e
+digite. Ele é aceito quando a diferença para o calculado é de até **R$ 50,00**
+(e é ele que entra nas despesas). O campo mostra o valor calculado ao lado,
+para conferir: com essa folga, um erro de digitação de até R$ 50,00 passa sem
+aviso. Diferença maior é recusada. O banco confere a mesma regra (migration
+0009; até a 0008 a tolerância era de R$ 0,10).
+
+### 15.3 Como o consumo é calculado
+
+Entre dois abastecimentos de **tanque cheio**:
+
+- distância = km do cheio final − km do cheio inicial;
+- quantidade = o que foi abastecido **depois** do cheio inicial, até o cheio
+  final inclusive (os parciais do meio e o cheio final). A quantidade do cheio
+  inicial não entra.
+
+Exemplo: cheio aos 10.000 km; parcial de 10 L aos 10.100 km; cheio de 20 L
+aos 10.300 km → 300 / (10 + 20) = **10 km/L**.
+
+- O primeiro tanque cheio sozinho não dá consumo ("Primeiro tanque cheio").
+- Parcial antes do primeiro cheio fica "Fora do cálculo".
+- Ciclo com **mistura de combustíveis** (por exemplo, tanque com gasolina
+  completado com etanol) ou em que a quilometragem não aumentou fica "Sem
+  consumo" e não entra na média. O detalhe do abastecimento diz o motivo.
+- A média de cada combustível é a distância total dividida pela quantidade
+  total dos ciclos válidos (nunca a média simples dos km/L).
+- No mesmo dia, a ordem é a da quilometragem. Incluir, editar ou apagar um
+  abastecimento recalcula os ciclos afetados na hora.
+- Sem ciclos válidos, a tela diz "Ainda não há consumo calculado" (não mostra
+  zero).
+
+### 15.4 Etanol ou gasolina?
+
+Só para veículo flex. O limite vem do consumo real do **seu** carro:
+consumo do etanol ÷ consumo da gasolina (ex.: 7,9 ÷ 11,3 = **70%**). Não é
+usado um percentual fixo.
+
+- Compara com o último preço pago de cada combustível: se o etanol custou
+  menos que o limite (ex.: R$ 4,29 ÷ R$ 6,25 = 69%), "Hoje, o etanol compensa".
+- **Simular com os preços de hoje**: digite os preços da bomba e toque em
+  **Comparar**. Nada é gravado.
+- Sem a média dos dois combustíveis, a tela explica o que falta (é preciso
+  ter pelo menos dois tanques cheios de cada um).
+
+### 15.5 Finanças
+
+Cada abastecimento entra uma vez nas despesas, na categoria **Combustível**,
+pela data dele. Tocar no lançamento abre o abastecimento.
+
+### 15.6 Se a migration 0008 ou a 0010 parar por causa de abastecimentos antigos
+
+**0010** (tipos de cada combustível): ela converte sozinha gasolina
+"aditivada" em "comum aditivada" e etanol "aditivada" em "aditivado". Diesel
+com "comum" ou "aditivada" não diz se era S10 ou S500: ela lista, por exemplo,
+`abastecimento 7 (veículo 2, 20/09/2026): diesel "aditivada"`, e para sem
+alterar nada. No pgAdmin, troque o `tipo` para `s10`, `s10_aditivado`, `s500`
+ou `s500_aditivado` (ou deixe vazio, "não informado") e rode de novo
+`gerenciar.py migrar`.
+
+**0008** (total coerente):
+
+Ela lista, por exemplo: `abastecimento 5 (veículo 2, 15/09/2026): 38.500 ×
+R$ 4.290 = R$ 165.17, mas o total gravado é R$ 16.52`. Nada foi alterado.
+Confira o cupom e corrija no pgAdmin os litros, o preço ou o `valor_total`
+desse abastecimento. Depois rode de novo `gerenciar.py migrar`.

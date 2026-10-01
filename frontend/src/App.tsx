@@ -4,6 +4,7 @@ import { ComBarra } from "./components/BarraNavegacao";
 import { RotaProtegida, RotaSoParaVisitante } from "./components/Rotas";
 import { AuthProvider } from "./contexts/AuthContext";
 import { VeiculosProvider } from "./contexts/VeiculosContext";
+import AbastecimentoFormPage from "./pages/AbastecimentoFormPage";
 import CadastroPage from "./pages/CadastroPage";
 import ContaPage from "./pages/ContaPage";
 import DiagnosticoDetalhePage from "./pages/DiagnosticoDetalhePage";
@@ -75,6 +76,8 @@ export function RotasDoApp() {
         <Route path="/veiculos/:veiculoId/manutencoes/:manutencaoId/editar" element={<ManutencaoFormPage />} />
         <Route path="/veiculos/:veiculoId/diagnosticos/novo" element={<DiagnosticoFormPage />} />
         <Route path="/veiculos/:veiculoId/gastos/novo" element={<GastoFormPage />} />
+        <Route path="/veiculos/:veiculoId/abastecimentos/novo" element={<AbastecimentoFormPage />} />
+        <Route path="/veiculos/:veiculoId/abastecimentos/:abastecimentoId" element={<AbastecimentoFormPage />} />
         <Route path="/veiculos/:veiculoId/gastos/:gastoId" element={<GastoFormPage />} />
         <Route path="/veiculos/:veiculoId/diagnosticos/:diagnosticoId/editar" element={<DiagnosticoFormPage />} />
       </Route>

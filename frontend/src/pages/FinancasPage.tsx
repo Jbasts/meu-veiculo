@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router";
 
+import AbaCombustivel from "../components/AbaCombustivel";
 import Alerta from "../components/Alerta";
 import CampoTexto from "../components/CampoTexto";
 import { Carregando, ErroComNovaTentativa } from "../components/EstadoDaTela";
@@ -283,7 +284,8 @@ const ICONE_DO_TIPO: Record<TipoLancamento, { Icone: typeof IconeRecibo; tom: st
 function destinoDoLancamento(veiculoId: number, l: Lancamento): string | null {
   if (l.tipo === "manutencao") return `/veiculos/${veiculoId}/manutencoes/${l.origem_id}`;
   if (l.tipo === "gasto") return `/veiculos/${veiculoId}/gastos/${l.origem_id}`;
-  return null; // abastecimento e projeto ganham tela nas etapas 7 e 8
+  if (l.tipo === "abastecimento") return `/veiculos/${veiculoId}/abastecimentos/${l.origem_id}`;
+  return null; // item de projeto ganha tela na etapa 8
 }
 
 function ItemLancamento({ veiculoId, lancamento: l }: { veiculoId: number; lancamento: Lancamento }) {
@@ -477,12 +479,17 @@ function Conteudo({ veiculo }: { veiculo: Veiculo }) {
           <h1 className="titulo-pagina">Finanças</h1>
           <p className="texto-suave cabecalho-pagina__sub">{veiculo.modelo} {veiculo.ano}</p>
         </div>
-        {veiculo.ativo && (
+        {veiculo.ativo && (aba === "combustivel" ? (
+          <Link to={`/veiculos/${veiculo.id}/abastecimentos/novo`} className="botao-redondo botao-redondo--grande"
+            aria-label="Novo abastecimento">
+            <IconeMaisSinal />
+          </Link>
+        ) : (
           <Link to={`/veiculos/${veiculo.id}/gastos/novo`} className="botao-redondo botao-redondo--grande"
             aria-label="Novo gasto">
             <IconeMaisSinal />
           </Link>
-        )}
+        ))}
       </header>
       {mensagem && <Alerta tipo="sucesso">{mensagem}</Alerta>}
       {!veiculo.ativo && (
@@ -500,13 +507,9 @@ function Conteudo({ veiculo }: { veiculo: Veiculo }) {
       </div>
 
       {aba === "combustivel" ? (
-        <section className="cartao" role="tabpanel">
-          <p className="cartao__titulo">Ainda não disponível</p>
-          <p className="texto-suave">
-            Os abastecimentos, o consumo médio e a comparação etanol × gasolina chegam na etapa 7 do
-            projeto. Os abastecimentos já registrados entram no total da aba Gastos.
-          </p>
-        </section>
+        <div role="tabpanel">
+          <AbaCombustivel key={veiculo.id} veiculo={veiculo} />
+        </div>
       ) : (
         <div role="tabpanel">
           <div className="opcoes opcoes--periodo" role="group" aria-label="Período">

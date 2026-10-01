@@ -29,6 +29,7 @@ from app.banco.conexao import obter_engine
 from app.banco.sessao import UnidadeDeTrabalho, abrir_sessao
 from app.banco.versao import problema_de_versao
 from app.config import Configuracoes, obter_configuracoes
+from app.controllers.abastecimento_controller import AbastecimentoController
 from app.controllers.auth_controller import AuthController, ConfigCookie, ler_token
 from app.controllers.diagnostico_controller import DiagnosticoController
 from app.controllers.foto_controller import FotoController
@@ -37,6 +38,7 @@ from app.controllers.manutencao_controller import ManutencaoController
 from app.controllers.saude_controller import SaudeController
 from app.controllers.veiculo_controller import VeiculoController
 from app.entities.sessao import SessaoAtual
+from app.repositories.abastecimento_repository import AbastecimentoRepository
 from app.repositories.arquivo_foto_repository import ArquivoFotoRepository
 from app.repositories.diagnostico_repository import DiagnosticoRepository
 from app.repositories.foto_repository import FotoRepository
@@ -49,6 +51,7 @@ from app.repositories.sessao_repository import SessaoRepository
 from app.repositories.tentativa_acesso_repository import TentativaAcessoRepository
 from app.repositories.usuario_repository import UsuarioRepository
 from app.repositories.veiculo_repository import VeiculoRepository
+from app.services.abastecimento_service import AbastecimentoService
 from app.services.autenticacao_service import AutenticacaoService
 from app.services.diagnostico_service import DiagnosticoService
 from app.services.email_service import EnviadorEmail, criar_enviador
@@ -173,6 +176,13 @@ def obter_diagnostico_controller(
         uow, veiculos, DiagnosticoRepository(sessao), ManutencaoRepository(sessao),
         LeituraKmRepository(sessao), FotoRepository(sessao), arquivos,
         _manutencao_service(sessao, uow, veiculos, PlanoRepository(sessao), arquivos),
+    ))
+
+
+def obter_abastecimento_controller(sessao: SessaoDep) -> AbastecimentoController:
+    return AbastecimentoController(AbastecimentoService(
+        UnidadeDeTrabalho(sessao), VeiculoRepository(sessao), AbastecimentoRepository(sessao),
+        LeituraKmRepository(sessao),
     ))
 
 

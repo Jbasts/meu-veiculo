@@ -87,3 +87,41 @@ export function formatarTamanho(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} MB`;
 }
+
+/**
+ * Número com até 3 casas digitado pela pessoa -> texto para a API.
+ * "38,5" -> "38.500"; "40" -> "40.000"; "6,25" -> "6.250". Vazio -> null.
+ * Mais de 3 casas ou texto que não é número -> undefined.
+ */
+export function lerDecimal3(texto: string): string | null | undefined {
+  const limpo = texto.replace(/R\$/i, "").replace(/\s/g, "");
+  if (!limpo) return null;
+  const partes = /^(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d{1,3}))?$/.exec(limpo);
+  if (!partes) return undefined;
+  const inteiros = partes[1].replace(/\./g, "").replace(/^0+(?=\d)/, "");
+  return `${inteiros}.${(partes[2] ?? "").padEnd(3, "0")}`;
+}
+
+/** "38.500" (da API) -> "38,5"; "40.000" -> "40" (sem zeros sobrando). */
+export function formatarDecimal(valor: string, minimoDeCasas = 0): string {
+  const [inteiros, fracao = ""] = valor.split(".");
+  let casas = fracao.replace(/0+$/, "");
+  if (casas.length < minimoDeCasas) casas = casas.padEnd(minimoDeCasas, "0");
+  return `${mascararInteiro(inteiros) || "0"}${casas ? `,${casas}` : ""}`;
+}
+
+/**
+ * Litros × preço por litro (os dois com 3 casas, como a API usa), arredondado
+ * para centavos meio para cima, em inteiros: "38.500" × "4.290" -> "165.17".
+ * Só para mostrar na tela; o valor gravado é o que o backend calcula.
+ */
+export function multiplicarParaCentavos(litros: string, preco: string): string {
+  const milesimos = (texto: string) => {
+    const [i, f = ""] = texto.split(".");
+    return BigInt(i || "0") * 1000n + BigInt(f.padEnd(3, "0").slice(0, 3));
+  };
+  const produto = milesimos(litros) * milesimos(preco); // em milionésimos de real
+  const centavos = (produto + 5000n) / 10000n;            // meio para cima
+  const texto = centavos.toString().padStart(3, "0");
+  return `${texto.slice(0, -2)}.${texto.slice(-2)}`;
+}

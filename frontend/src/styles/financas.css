@@ -139,3 +139,152 @@
   justify-content: center;
   min-height: 46px;
 }
+
+/* ------------------------------------------------- combustível (PDF 11 e 13) */
+
+.cartao-consumo {
+  background: var(--cor-petroleo-escuro);
+  color: var(--cor-texto-claro);
+  border-radius: var(--raio-cartao);
+  padding: 18px 20px;
+  margin-bottom: 18px;
+}
+
+.cartao-consumo p {
+  margin: 0;
+}
+
+.cartao-consumo__medias {
+  display: flex;
+}
+
+.cartao-consumo__media {
+  flex: 1;
+}
+
+.cartao-consumo__media + .cartao-consumo__media {
+  border-left: 1px solid rgba(255, 255, 255, 0.25);
+  padding-left: 18px;
+}
+
+.cartao-consumo__valor {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 2.6rem;
+  line-height: 1.1;
+  color: #fff;
+}
+
+.cartao-consumo__valor span {
+  font-size: 1.2rem;
+}
+
+.cartao-consumo__vazio {
+  font-weight: 600;
+  color: #fff;
+}
+
+.cartao-consumo__nota {
+  margin-top: 10px !important;
+  font-size: 0.95rem;
+}
+
+.comparacao p {
+  margin: 0;
+}
+
+.comparacao__titulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 8px !important;
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: var(--cor-primaria);
+}
+
+.comparacao__barra {
+  position: relative;
+  height: 8px;
+  margin: 34px 0 8px;
+  border-radius: 999px;
+  background: linear-gradient(to right, #9fc5cc 0 var(--limite, 70%), #f2c97d var(--limite, 70%) 100%);
+}
+
+.comparacao__marca {
+  position: absolute;
+  top: -26px;
+  transform: translateX(-50%);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.comparacao__marca::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 20px;
+  width: 4px;
+  height: 22px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: var(--cor-texto);
+}
+
+.comparacao__legenda {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  color: var(--cor-texto-suave);
+}
+
+.comparacao__precos {
+  margin-top: 10px !important;
+  font-size: 0.9rem;
+}
+
+.comparacao__abrir,
+.botao-link--neutro {
+  margin: 10px 0 0;
+  color: var(--cor-primaria);
+}
+
+.comparacao__simular {
+  margin-top: 14px;
+}
+
+.consumo-destaque {
+  font-weight: 600;
+  color: var(--cor-primaria);
+}
+
+.total-abastecimento {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-radius: var(--raio-botao);
+  background: var(--cor-ok-fundo);
+}
+
+.total-abastecimento strong {
+  font-family: var(--fonte-titulo);
+  font-size: 1.9rem;
+}
+
+.total-abastecimento + .botao-link {
+  margin-bottom: 14px;
+}
+
+.recentes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: -6px 0 18px;
+}
+
+.tipo__dica {
+  margin: -8px 0 16px;
+}

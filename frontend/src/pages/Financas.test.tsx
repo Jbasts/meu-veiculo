@@ -95,8 +95,6 @@ describe("Finanças: aba Gastos", () => {
       "href", "/veiculos/7/manutencoes/12");
     expect(within(lancamentos).getByRole("link", { name: /Estacionamento/ })).toHaveAttribute(
       "href", "/veiculos/7/gastos/9");
-    // Abastecimento ainda não tem tela (etapa 7): aparece, mas sem link.
-    expect(within(lancamentos).getByText("Abastecimento, Shell").closest("a")).toBeNull();
     expect(screen.getByRole("link", { name: "Novo gasto" })).toHaveAttribute("href", "/veiculos/7/gastos/novo");
   });
 
@@ -141,11 +139,12 @@ describe("Finanças: aba Gastos", () => {
     expect(chamadasPara(buscar, URL_RESUMO()).length).toBeGreaterThanOrEqual(2);
   });
 
-  it("a aba Combustível avisa que chega na etapa 7", async () => {
-    apiFalsa(BASE);
+  it("o lançamento de abastecimento abre o abastecimento", async () => {
+    apiFalsa({ ...BASE, [URL_LANCAMENTOS()]: () => pagina(LANCAMENTOS) });
     renderizarApp("/financas");
-    await userEvent.click(await screen.findByRole("tab", { name: "Combustível" }));
-    expect(screen.getByText(/chegam na etapa 7/)).toBeInTheDocument();
+    const lancamentos = await screen.findByRole("region", { name: "Lançamentos" });
+    expect(within(lancamentos).getByRole("link", { name: /Abastecimento, Shell/ })).toHaveAttribute(
+      "href", "/veiculos/7/abastecimentos/3");
   });
 });
 

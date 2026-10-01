@@ -3,13 +3,16 @@ import { describe, expect, it } from "vitest";
 import { formatarMesAnoCurto, formatarMesAnoLongo, hojeIso } from "./datas";
 import {
   dinheiroParaCampo,
+  formatarDecimal,
   formatarDinheiro,
   formatarKm,
   formatarPlaca,
   formatarTamanho,
+  lerDecimal3,
   lerDinheiro,
   lerInteiro,
   mascararInteiro,
+  multiplicarParaCentavos,
   normalizarPlaca,
   placaValida,
   somarDinheiro,
@@ -98,5 +101,29 @@ describe("datas e tamanhos", () => {
   it("formata o tamanho do arquivo", () => {
     expect(formatarTamanho(500)).toBe("1 KB");
     expect(formatarTamanho(2_621_440)).toBe("2,5 MB");
+  });
+});
+
+describe("decimais do abastecimento", () => {
+  it("lê litros e preço com até 3 casas, sem float", () => {
+    expect(lerDecimal3("38,5")).toBe("38.500");
+    expect(lerDecimal3("R$ 6,25")).toBe("6.250");
+    expect(lerDecimal3("1.234,567")).toBe("1234.567");
+    expect(lerDecimal3("")).toBeNull();
+    expect(lerDecimal3("1,2345")).toBeUndefined();
+    expect(lerDecimal3("abc")).toBeUndefined();
+  });
+
+  it("calcula o total meio para cima, como o backend", () => {
+    expect(multiplicarParaCentavos("38.500", "4.290")).toBe("165.17"); // 165,165
+    expect(multiplicarParaCentavos("40.000", "6.250")).toBe("250.00");
+    expect(multiplicarParaCentavos("0.001", "4.999")).toBe("0.00");
+  });
+
+  it("mostra sem zeros sobrando", () => {
+    expect(formatarDecimal("38.500")).toBe("38,5");
+    expect(formatarDecimal("40.000")).toBe("40");
+    expect(formatarDecimal("6.250", 2)).toBe("6,25");
+    expect(formatarDecimal("1234.567")).toBe("1.234,567");
   });
 });
