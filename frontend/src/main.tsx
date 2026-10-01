@@ -7,6 +7,7 @@ import "./styles/tema.css";
 import "./styles/veiculos.css";
 import "./styles/manutencao.css";
 import "./styles/diagnostico.css";
+import "./styles/financas.css";
 
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";

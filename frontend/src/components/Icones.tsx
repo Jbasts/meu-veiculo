@@ -56,3 +56,16 @@ export const IconeRelogio = (p: Props) => (
 export const IconeFerramentas = (p: Props) => (
   <Icone {...p}><circle cx="12" cy="12" r="3" /><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" /></Icone>
 );
+export const IconeBomba = (p: Props) => (
+  <Icone {...p}><path d="M4 20V5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v15" /><path d="M3 20h12" /><path d="M7 8h4" /><path d="M14 10h2a2 2 0 0 1 2 2v4a1.5 1.5 0 0 0 3 0V8l-3-3" /></Icone>
+);
+export const IconeRecibo = (p: Props) => (
+  <Icone {...p}><path d="M6 3h12v18l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5L6 21z" /><path d="M9 8h6" /><path d="M9 12h6" /><path d="M9 16h3" /></Icone>
+);
+export const IconeCalendario = (p: Props) => (
+  <Icone {...p}><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M4 10h16" /><path d="M9 3v4" /><path d="M15 3v4" /></Icone>
+);
+export const IconeSetaEsquerda = (p: Props) => <Icone {...p}><path d="M15 5l-7 7 7 7" /></Icone>;
+export const IconeProjeto = (p: Props) => (
+  <Icone {...p}><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z" /></Icone>
+);

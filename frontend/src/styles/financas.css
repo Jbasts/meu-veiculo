@@ -1,0 +1,141 @@
+/* Finanças (PDF, páginas 10 e 12): seletor de mês, total em destaque,
+   barras por categoria, contas a vencer e o valor grande do "Novo gasto". */
+
+.seletor-mes {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 4px 0 12px;
+}
+
+.seletor-mes__botao {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--cor-cartao);
+  border: 1px solid var(--cor-borda);
+}
+
+.seletor-mes__botao:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.seletor-mes__nome {
+  margin: 0;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.total-mes {
+  text-align: center;
+  margin: 8px 0 22px;
+}
+
+.total-mes p {
+  margin: 0;
+}
+
+.total-mes__valor {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 3rem;
+  line-height: 1.1;
+}
+
+/* ------------------------------------------------------------ por categoria */
+
+.categorias {
+  list-style: none;
+  padding: 4px 18px;
+}
+
+.categorias__linha {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.categorias__linha:last-child {
+  border-bottom: none;
+}
+
+.categorias__topo {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.categorias__barra {
+  display: block;
+  height: 8px;
+  margin-top: 8px;
+  border-radius: 999px;
+  background: var(--cor-neutro-fundo);
+  overflow: hidden;
+}
+
+.categorias__cheia {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--cor-texto-suave);
+}
+
+.categorias__cheia--manutencao {
+  background: var(--cor-primaria);
+}
+
+.categorias__cheia--combustivel {
+  background: var(--cor-destaque);
+}
+
+.categorias__cheia--projeto {
+  background: var(--cor-petroleo-medio);
+}
+
+/* ------------------------------------------------------------ previsto/contas */
+
+.previsto p {
+  margin: 0;
+}
+
+.previsto__linha {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px !important;
+}
+
+.conta__valor {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+/* --------------------------------------------------------------- novo gasto */
+
+.valor-grande .campo__entrada {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 2rem;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.chave + .campo {
+  margin-top: 4px;
+}
+
+/* Mês | Ano | Total */
+.opcoes--periodo {
+  justify-content: center;
+  margin: 0 0 12px;
+}
+
+.seletor-mes--sozinho {
+  justify-content: center;
+  min-height: 46px;
+}

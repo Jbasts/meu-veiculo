@@ -32,6 +32,7 @@ from app.config import Configuracoes, obter_configuracoes
 from app.controllers.auth_controller import AuthController, ConfigCookie, ler_token
 from app.controllers.diagnostico_controller import DiagnosticoController
 from app.controllers.foto_controller import FotoController
+from app.controllers.gasto_controller import GastoController
 from app.controllers.manutencao_controller import ManutencaoController
 from app.controllers.saude_controller import SaudeController
 from app.controllers.veiculo_controller import VeiculoController
@@ -39,6 +40,7 @@ from app.entities.sessao import SessaoAtual
 from app.repositories.arquivo_foto_repository import ArquivoFotoRepository
 from app.repositories.diagnostico_repository import DiagnosticoRepository
 from app.repositories.foto_repository import FotoRepository
+from app.repositories.gasto_repository import FinancasRepository, GastoRepository
 from app.repositories.leitura_km_repository import LeituraKmRepository
 from app.repositories.manutencao_repository import ManutencaoRepository, PlanoRepository
 from app.repositories.recuperacao_senha_repository import RecuperacaoSenhaRepository
@@ -52,6 +54,7 @@ from app.services.diagnostico_service import DiagnosticoService
 from app.services.email_service import EnviadorEmail, criar_enviador
 from app.services.erros import AcessoNegado, ServicoIndisponivel
 from app.services.foto_service import FotoService
+from app.services.gasto_service import FinancasService, GastoService
 from app.services.manutencao_service import ManutencaoService, PlanoService
 from app.services.quilometragem_service import QuilometragemService
 from app.services.saude_service import SaudeService
@@ -171,6 +174,14 @@ def obter_diagnostico_controller(
         LeituraKmRepository(sessao), FotoRepository(sessao), arquivos,
         _manutencao_service(sessao, uow, veiculos, PlanoRepository(sessao), arquivos),
     ))
+
+
+def obter_gasto_controller(sessao: SessaoDep) -> GastoController:
+    veiculos = VeiculoRepository(sessao)
+    return GastoController(
+        GastoService(UnidadeDeTrabalho(sessao), veiculos, GastoRepository(sessao)),
+        FinancasService(veiculos, FinancasRepository(sessao)),
+    )
 
 
 # --------------------------------------------------------------------- proteções

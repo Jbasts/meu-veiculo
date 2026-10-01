@@ -49,3 +49,25 @@ export function hojeIso(agora: Date = new Date()): string {
   const valor = (tipo: string) => partes.find((p) => p.type === tipo)?.value ?? "";
   return `${valor("year")}-${valor("month")}-${valor("day")}`;
 }
+
+export interface MesAno {
+  ano: number;
+  mes: number; // 1 a 12
+}
+
+/** "2026-09-20" -> { ano: 2026, mes: 9 } */
+export function mesDaData(dataIso: string): MesAno {
+  const [ano, mes] = partesDaData(dataIso);
+  return { ano: Number(ano), mes: Number(mes) };
+}
+
+/** Soma (ou subtrai) meses: { 2026, 1 } - 1 -> { 2025, 12 }. */
+export function somarMeses({ ano, mes }: MesAno, quantos: number): MesAno {
+  const indice = ano * 12 + (mes - 1) + quantos;
+  return { ano: Math.floor(indice / 12), mes: (indice % 12) + 1 };
+}
+
+/** { 2026, 9 } -> "Setembro de 2026" */
+export function nomeDoMes({ ano, mes }: MesAno): string {
+  return formatarMesAnoLongo(`${ano}-${String(mes).padStart(2, "0")}-01`);
+}

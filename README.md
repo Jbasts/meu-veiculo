@@ -397,6 +397,7 @@ npm run typecheck
 | `coluna ... não existe` (erro 500) no terminal do backend | mesma causa, em versão antiga do código sem o aviso 503 | `.\.venv\Scripts\python.exe gerenciar.py migrar` (pasta `backend`) |
 | Ao salvar a manutenção aparece "A data não pode ser anterior" | ela resolve um diagnóstico identificado depois dessa data | corrija a data da manutenção ou a do diagnóstico (seção 13.3) |
 | `gerenciar.py migrar` para na 0006 com uma lista de diagnósticos ou fotos | vínculos antigos entre veículos diferentes ou incoerentes | corrija os vínculos listados (seção 13.6); nada foi alterado |
+| `gerenciar.py migrar` para na 0007 com uma lista de gastos pendentes | gastos antigos pendentes sem vencimento | informe o vencimento ou marque como pago (seção 14.6); nada foi alterado |
 | `Com peças ou mão de obra detalhadas, o total é calculado automaticamente` | foi enviado um total junto com itens | normal: com itens, o total é a soma; tire os itens para informar só o total (seção 12.3) |
 | `A migration 0004 parou: ... está ligada ao plano ..., que é do veículo ...` | registro antigo ligado a plano ou manutenção de outro veículo | seção 12.6 |
 
@@ -774,3 +775,81 @@ deixe `manutencao_id` / `diagnostico_id` vazio; para o terceiro caso, ou a
 manutenção foi mesmo feita (mude-a para `realizada`) ou o diagnóstico ainda
 está aberto (mude para `aberto` e deixe `data_resolucao` vazia). Não apague
 registros sem conferir. Depois rode de novo `gerenciar.py migrar`.
+
+## 14. Finanças e gastos
+
+### 14.1 O que entra no total do mês
+
+O total da aba **Gastos** soma só o que realmente saiu do bolso, cada valor
+uma vez, pela tabela de origem:
+
+| Entra no total | Pela data |
+|---|---|
+| Manutenção **realizada** (o total dela, com peças e mão de obra) | da manutenção |
+| Abastecimento | do abastecimento |
+| Gasto **pago** | do **pagamento** |
+| Item de projeto (inclusive de projeto cancelado: a despesa aconteceu) | do item |
+
+Não entram: manutenção **agendada** e gasto **pendente**. Eles aparecem
+separados, no quadro **Previsto (não entra no total)** do mês e nas listas
+**Vencidas** e **A vencer**. Nenhuma cópia em gasto é criada para uma
+manutenção ou um abastecimento: o valor já conta pela tabela de origem.
+
+Exemplo: estacionamento pago de R$ 30,00 + troca de óleo realizada de
+R$ 350,00 = R$ 380,00. Uma manutenção agendada de R$ 120,00 no mesmo mês fica
+no "Previsto" e o total continua R$ 380,00.
+
+### 14.2 Mês do gasto pago
+
+Um gasto pago entra no mês da **data do pagamento**. Exemplo: seguro lançado
+em 24/09 como pendente (vence 10/11) e pago em 08/11 entra em **novembro**.
+
+- No "Novo gasto" com **Já foi pago** ligado, a data do pagamento acompanha a
+  data do gasto (dá para mudar).
+- Em **Vencidas**/**A vencer**, **Marcar como pago** pergunta a data
+  (padrão: hoje).
+- Gastos pagos registrados antes desta versão podem não ter a data do
+  pagamento. Ela não é inventada: esses contam pela data do gasto, e a tela
+  avisa "Não informada (gasto antigo)".
+
+### 14.3 Contas pendentes
+
+Gasto pendente exige **vencimento** (o banco também confere). Ele aparece em:
+
+- **Vencidas**: vencimento antes de hoje ("há 3 dias");
+- **A vencer**: vence hoje ou depois ("em 47 dias").
+
+As listas mostram todas as contas pendentes do veículo, de qualquer mês.
+
+### 14.4 Por categoria e arredondamento
+
+Os totais são somados pelo PostgreSQL (`numeric`, sem arredondar). O
+percentual de cada categoria é calculado no backend com `Decimal`,
+arredondado para inteiro **meio para cima** (12,5% vira 13%). Por isso a soma
+dos percentuais pode dar 99% ou 101%. Mês sem despesas mostra R$ 0,00 e
+nenhuma categoria (não inventa percentuais).
+
+### 14.5 Navegação: Mês, Ano e Total
+
+Na aba **Gastos**, escolha o período:
+
+- **Mês**: as setas trocam o mês ("Setembro de 2026").
+- **Ano**: o ano inteiro, de 1º de janeiro a 31 de dezembro ("Ano de 2026");
+  as setas trocam o ano.
+- **Total**: tudo desde o primeiro registro do veículo, sem setas.
+
+O total, as categorias, o "Previsto" e os lançamentos seguem o período
+escolhido, com as mesmas regras (gasto pago pela data do pagamento, nada
+contado duas vezes). Não é possível ir além do mês ou do ano atual. As contas
+**Vencidas** e **A vencer** são sempre todas as pendentes, de qualquer período.
+
+- Tocar num lançamento abre a manutenção ou o gasto. Abastecimentos e itens
+  de projeto ganham tela nas etapas 7 e 8 (por enquanto aparecem sem link).
+- A aba **Combustível** chega na etapa 7.
+
+### 14.6 Se a migration 0007 parar por causa de gastos pendentes sem vencimento
+
+Ela lista, por exemplo: `gasto 4 (veículo 2, seguro, R$ 2400.00, lançado em
+18/09/2026) está pendente e sem vencimento`. Nada foi alterado. No pgAdmin,
+informe a `data_vencimento` desse gasto ou, se ele já foi pago, marque
+`pago = true`. Depois rode de novo `gerenciar.py migrar`.

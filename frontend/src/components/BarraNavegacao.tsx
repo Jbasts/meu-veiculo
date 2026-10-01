@@ -18,13 +18,15 @@ export default function BarraNavegacao() {
     <nav className="barra" aria-label="Navegação principal">
       {ITENS.map(({ para, rotulo, Icone, prefixos }) => {
         // /veiculos/7/manutencoes e /veiculos/7/planos pertencem à aba Manutenção;
-        // /veiculos/7/diagnosticos, à aba Diagnóstico.
+        // /veiculos/7/diagnosticos, à aba Diagnóstico; /veiculos/7/financas e /gastos, a Finanças.
         const deManutencao = /^\/veiculos\/\d+\/(manutencoes|planos)/.test(pathname);
         const deDiagnostico = /^\/veiculos\/\d+\/diagnosticos/.test(pathname);
+        const deFinancas = /^\/veiculos\/\d+\/(financas|gastos)/.test(pathname);
         const ativo = para === "/" ? pathname === "/"
           : para === "/manutencao" ? deManutencao || pathname.startsWith("/manutencao")
             : para === "/diagnostico" ? deDiagnostico || pathname.startsWith("/diagnostico")
-              : !deManutencao && !deDiagnostico && prefixos.some((p) => pathname.startsWith(p));
+              : para === "/financas" ? deFinancas || pathname.startsWith("/financas")
+                : !deManutencao && !deDiagnostico && !deFinancas && prefixos.some((p) => pathname.startsWith(p));
         return (
           <NavLink key={para} to={para} end
             className={`barra__item${ativo ? " barra__item--ativo" : ""}`}

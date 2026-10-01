@@ -9,11 +9,12 @@ import ContaPage from "./pages/ContaPage";
 import DiagnosticoDetalhePage from "./pages/DiagnosticoDetalhePage";
 import DiagnosticoFormPage from "./pages/DiagnosticoFormPage";
 import DiagnosticoPage, { DiagnosticoDoVeiculoPage } from "./pages/DiagnosticoPage";
-import EmBrevePage from "./pages/EmBrevePage";
 import EsqueciSenhaPage from "./pages/EsqueciSenhaPage";
 import FotoDetalhePage from "./pages/FotoDetalhePage";
 import FotoNovaPage from "./pages/FotoNovaPage";
+import FinancasPage, { FinancasDoVeiculoPage } from "./pages/FinancasPage";
 import FotosPage from "./pages/FotosPage";
+import GastoFormPage from "./pages/GastoFormPage";
 import InicioPage from "./pages/InicioPage";
 import LoginPage from "./pages/LoginPage";
 import MaisPage from "./pages/MaisPage";
@@ -56,10 +57,8 @@ export function RotasDoApp() {
           <Route path="/diagnostico" element={<DiagnosticoPage />} />
           <Route path="/veiculos/:veiculoId/diagnosticos" element={<DiagnosticoDoVeiculoPage />} />
           <Route path="/veiculos/:veiculoId/diagnosticos/:diagnosticoId" element={<DiagnosticoDetalhePage />} />
-          <Route path="/financas" element={
-            <EmBrevePage titulo="Finanças" etapa={6}
-              descricao="Aqui ficarão os gastos do mês e, na etapa 7, os abastecimentos e o consumo." />
-          } />
+          <Route path="/financas" element={<FinancasPage />} />
+          <Route path="/veiculos/:veiculoId/financas" element={<FinancasDoVeiculoPage />} />
           <Route path="/mais" element={<MaisPage />} />
           <Route path="/conta" element={<ContaPage />} />
           <Route path="/veiculos" element={<VeiculosPage />} />
@@ -75,6 +74,8 @@ export function RotasDoApp() {
         <Route path="/veiculos/:veiculoId/manutencoes/nova" element={<ManutencaoFormPage />} />
         <Route path="/veiculos/:veiculoId/manutencoes/:manutencaoId/editar" element={<ManutencaoFormPage />} />
         <Route path="/veiculos/:veiculoId/diagnosticos/novo" element={<DiagnosticoFormPage />} />
+        <Route path="/veiculos/:veiculoId/gastos/novo" element={<GastoFormPage />} />
+        <Route path="/veiculos/:veiculoId/gastos/:gastoId" element={<GastoFormPage />} />
         <Route path="/veiculos/:veiculoId/diagnosticos/:diagnosticoId/editar" element={<DiagnosticoFormPage />} />
       </Route>
       <Route path="/entrar" element={<RotaSoParaVisitante><LoginPage /></RotaSoParaVisitante>} />

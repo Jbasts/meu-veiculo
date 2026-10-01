@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { apiFalsa, chamadasPara, json, PAULA, renderizarApp } from "../tests/apiFalsa";
 import type { Foto, LeituraKm, Veiculo } from "../types/veiculo";
-import { hojeIso } from "../utils/datas";
+import { hojeIso, mesDaData } from "../utils/datas";
 
 const CIVIC: Veiculo = {
   id: 7, usuario_id: 1, marca: "Honda", modelo: "Civic", versao: null, ano: 2020,
@@ -33,6 +33,8 @@ function pagina<T>(itens: T[], total = itens.length) {
 }
 
 const LOGADO = { "GET /api/auth/eu": () => json(200, PAULA) };
+const MES_ATUAL = mesDaData(hojeIso());
+
 const COM_CIVIC = {
   ...LOGADO,
   "GET /api/veiculos": () => json(200, [CIVIC]),
@@ -43,6 +45,14 @@ const COM_CIVIC = {
   "GET /api/veiculos/7/diagnosticos?filtro=abertos&pagina=1&por_pagina=5": () => pagina([]),
   "GET /api/veiculos/7/diagnosticos?filtro=abertos&pagina=1&por_pagina=20": () => pagina([]),
   "GET /api/veiculos/7/diagnosticos?filtro=resolvidos&pagina=1&por_pagina=3": () => pagina([]),
+  // Finanças do mês atual, sem lançamentos.
+  [`GET /api/veiculos/7/financas/resumo?ano=${MES_ATUAL.ano}&mes=${MES_ATUAL.mes}`]: () => json(200, {
+    ano: MES_ATUAL.ano, mes: MES_ATUAL.mes, total: "0.00", quantidade: 0, categorias: [],
+    previsto_manutencoes: "0.00", quantidade_manutencoes_previstas: 0, previsto_gastos: "0.00",
+    quantidade_gastos_previstos: 0 }),
+  "GET /api/veiculos/7/gastos/pendentes?pagina=1&por_pagina=50": () => pagina([]),
+  [`GET /api/veiculos/7/financas/lancamentos?ano=${MES_ATUAL.ano}&mes=${MES_ATUAL.mes}&pagina=1&por_pagina=50`]:
+    () => pagina([]),
 };
 
 function corpoDe(buscar: ReturnType<typeof apiFalsa>, chave: string) {
@@ -89,8 +99,8 @@ describe("Início e navegação", () => {
     expect(await screen.findByText("Nenhum problema em aberto")).toBeInTheDocument();
     expect(within(barra).getByRole("link", { name: "Diagnóstico" })).toHaveAttribute("aria-current", "page");
     await userEvent.click(within(barra).getByRole("link", { name: "Finanças" }));
-    expect(await screen.findByText("Ainda não disponível")).toBeInTheDocument();
-    expect(screen.getByText(/etapa 6/)).toBeInTheDocument();
+    expect(await screen.findByText("Nenhuma despesa neste mês")).toBeInTheDocument();
+    expect(within(barra).getByRole("link", { name: "Finanças" })).toHaveAttribute("aria-current", "page");
 
     await userEvent.click(screen.getByRole("link", { name: "Mais" }));
     expect(await screen.findByRole("heading", { name: "Mais" })).toBeInTheDocument();

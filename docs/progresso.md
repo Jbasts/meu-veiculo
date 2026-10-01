@@ -9,8 +9,8 @@ Status possíveis: **pendente**, **em andamento**, **entregue** (código pronto 
 | 2 | Cadastro, login, recuperação de senha e permissões | validada |
 | 3 | Veículos, quilometragem e base das fotos (upload, capa e galeria) | validada |
 | 4 | Manutenções e planos (inclui fotos ligadas a manutenção) | validada |
-| 5 | Diagnósticos (inclui fotos ligadas a diagnóstico) | entregue |
-| 6 | Gastos e finanças | pendente |
+| 5 | Diagnósticos (inclui fotos ligadas a diagnóstico) | validada |
+| 6 | Gastos e finanças | entregue |
 | 7 | Abastecimentos e consumo | pendente |
 | 8 | Projetos e fotos de antes/depois | pendente |
 | 9 | Histórico, tela inicial e administração | pendente |
@@ -132,4 +132,25 @@ A ordem pode ser ajustada na etapa 0 para respeitar dependências; registre o mo
 - Depende de validação da Paula:
   - Reiniciar o backend e usar as telas com os dados reais: registrar um problema, anotar, resolver com manutenção nova (realizada e agendada), usar uma já registrada, descartar, reabrir, foto ligada ao diagnóstico.
   - Celular (Android/Chrome): etapa 10.
+- Validado pela Paula (30/09/2026): testou as telas com os dados reais; tudo funcionou. Commit `098a41a`.
 - Pendências para a próxima etapa (6 — gastos e finanças): envio real por SMTP continua sem teste; diagnóstico não entra nas despesas (o custo é o da manutenção).
+
+### Etapa 6 — Gastos e finanças (01/10/2026)
+- Decisões da Paula (30/09/2026): gasto pago entra no mês do pagamento (coluna nova `data_pagamento`); gasto pendente exige vencimento.
+- Ficou funcionando (código + testes do Claude):
+  - Migration 0007: `gasto.data_pagamento`; CHECKs "pendente tem vencimento" e "pendente não tem pagamento" (com conferência prévia que lista pendentes antigos sem vencimento e para sem alterar nada); view `vw_despesa` (manutenção realizada, abastecimento, gasto pago pela data do pagamento, item de projeto inclusive de projeto cancelado, cada valor uma vez); `vw_historico` com as mesmas colunas, posicionando o gasto pago pela data do pagamento. Gastos pagos antigos ficam sem data do pagamento (não inventada).
+  - Backend: `GastoService` (cadastro, edição, pago/pendente, marcar como pago, apagar, lista de pendentes com vencido/vence hoje/a vencer e dias) e `FinancasService` (total do mês, categorias com percentual `Decimal` meio para cima, previsto do mês fora do total, lançamentos paginados), 8 endpoints em `/api/veiculos/{id}/gastos` e `/financas`.
+  - Frontend: aba Finanças (Gastos com seletor de mês, total, "Por categoria" com barras, "Previsto", "Vencidas", "A vencer" com "Marcar como pago", lançamentos com link para a origem; Combustível avisa a etapa 7) e "Novo gasto"/edição como no PDF.
+- Arquivos criados: `backend/migrations/versions/0007_gastos_e_financas.py`; `backend/app/{entities/gasto, repositories/gasto_repository, services/gasto_service, schemas/gasto_schema, controllers/gasto_controller, routes/gasto_routes}.py`; `backend/tests/{test_migracao_0007, test_gastos_api}.py`; `frontend/src/{types/gasto.ts, services/gastoService.ts, pages/FinancasPage.tsx, pages/GastoFormPage.tsx, pages/Financas.test.tsx, styles/financas.css}`.
+- Arquivos alterados: `backend/app/{dependencias.py, entities/__init__.py, routes/__init__.py}`; `backend/tests/test_migracoes.py`; `frontend/src/{App.tsx, main.tsx, components/BarraNavegacao.tsx, components/Icones.tsx, utils/datas.ts, utils/datas.test.ts, pages/Veiculos.test.tsx}`; `README.md` (seção 14 e problemas comuns), `docs/decisoes.md`, `docs/progresso.md`.
+- Testes executados pelo Claude:
+  - `.\.venv\Scripts\python.exe -m pytest` (backend, PostgreSQL de teste): 478 passaram, 0 falharam (446 das etapas anteriores + 32 novos: 7 da migration 0007 — banco na 0006 com gastos antigos sem inventar datas, parada com pendente sem vencimento, desfazer/refazer, CHECKs, mês do pagamento, sem agendada e sem pendente e com projeto cancelado, manutenção com itens contada uma vez — e 25 pela API — validação, datas no futuro, valor como número recusado, total enviado pela tela recusado, vencidos/vence hoje/a vencer, marcar como pago e mudar de mês, previsto, mês vazio, arredondamento 12,5% → 13%, virada do mês e edição, lançamentos paginados, gasto antigo sem data do pagamento, isolamento entre usuários e veículos do mesmo dono, admin, veículo inativo).
+  - `npm test` (frontend): 133 passaram, 0 falharam; `npm run build` (com `tsc`) ok.
+  - Fluxo real no Chrome (tela 412×915, automatizado) com uvicorn + Vite no banco de TESTE: 11 passos, todos ok (Finanças vazia, gasto pago, manutenção realizada somada e agendada no previsto, conta pendente em "A vencer", vencida paga pelo diálogo, edição atualizando o total, troca de mês, aba Combustível, total conferido no backend, outra conta com 404, sem 5xx e sem erro no console). Capturas conferidas com o PDF.
+  - Banco de desenvolvimento: `gerenciar.py migrar` aplicou a 0007 com backup `meu_veiculo_20261001_084913_antes_de_migrar.dump`; conferência somente leitura: versão 0007, coluna e restrições criadas, dados preservados; `vw_despesa` soma exatamente as manutenções realizadas existentes (sem duplicar).
+- Depende de validação da Paula:
+  - Reiniciar o backend e usar a aba Finanças com os dados reais: gasto pago, conta pendente, marcar como pago, troca de mês, conferir que as manutenções já registradas aparecem no total do mês delas.
+  - Celular (Android/Chrome): etapa 10.
+- Ajuste pedido pela Paula depois dos testes dela (01/10/2026): além do mês, seletor **Mês | Ano | Total** na aba Gastos (total do ano e total geral desde o primeiro registro, com categorias, previsto e lançamentos do período). Sem migration nova. Testes depois do ajuste: backend 481 passaram, 0 falharam (3 novos: resumo do ano e do total, lançamentos do ano e do total, mês sem ano recusado); frontend 135 passaram, 0 falharam (2 novos); `npm run build` ok; fluxo no Chrome com 12 passos ok (inclui ano e total).
+- Não coberto nesta etapa: cadastro de abastecimentos e aba Combustível (etapa 7); telas de projeto (etapa 8); resumo de gastos no Início e custo do veículo (etapa 9). Os valores dessas tabelas já entram no total quando existirem.
+- Pendências para a próxima etapa (7 — abastecimentos e consumo): total do abastecimento calculado no backend com meio para cima (38,5 L × R$ 4,29 = R$ 165,17); ciclos de tanque cheio; link do lançamento de abastecimento nas Finanças; envio real por SMTP continua sem teste.
