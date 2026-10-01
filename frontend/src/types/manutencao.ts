@@ -1,5 +1,6 @@
 // Formatos de backend/app/schemas/manutencao_schema.py.
 
+import type { DiagnosticoLigado } from "./diagnostico";
 import { formatarDataIso } from "../utils/datas";
 import { formatarInteiro } from "../utils/formatos";
 
@@ -105,6 +106,8 @@ export interface ManutencaoDetalhe extends Manutencao {
   /** null quando não há itens: só o total, sem detalhamento (não é zero). */
   total_pecas: string | null;
   total_mao_de_obra: string | null;
+  /** Diagnósticos resolvidos por ela, ou à espera dela (agendada). */
+  diagnosticos: DiagnosticoLigado[];
 }
 
 export interface Pendencia extends Prazo {

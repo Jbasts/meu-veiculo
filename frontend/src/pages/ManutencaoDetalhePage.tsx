@@ -8,12 +8,14 @@ import { IconeLapis, IconeMaisSinal } from "../components/Icones";
 import { FotoProtegida } from "../components/PecasVeiculo";
 import SeloStatus, { type TomStatus } from "../components/SeloStatus";
 import TopoComVoltar from "../components/TopoComVoltar";
+import { SeloGravidade, TOM_DO_STATUS } from "../components/PecasDiagnostico";
 import { BotaoVerValores, rotulosDosValores } from "../components/ValoresManutencao";
 import { useVeiculos } from "../contexts/VeiculosContext";
 import { useVeiculoDaRota } from "../hooks/useVeiculoDaRota";
 import { ErroDaApi } from "../services/apiCliente";
 import { listarFotos } from "../services/fotoService";
 import { apagarManutencao, obterManutencao } from "../services/manutencaoService";
+import { ROTULO_STATUS } from "../types/diagnostico";
 import {
   rotuloSistema,
   textoPrevisao,
@@ -158,6 +160,27 @@ export default function ManutencaoDetalhePage() {
         </section>
       )}
 
+      {manutencao.diagnosticos.length > 0 && (
+        <section aria-label="Diagnósticos ligados">
+          <h2 className="titulo-secao">{realizada ? "Problemas resolvidos" : "Problemas que ela vai resolver"}</h2>
+          <ul className="cartao lista-simples">
+            {manutencao.diagnosticos.map((d) => (
+              <li key={d.id}>
+                <Link to={`${base}/diagnosticos/${d.id}`} className="lista-simples__item">
+                  <span className="lista-simples__texto">
+                    <span className="lista-simples__titulo">{d.titulo}</span>
+                    <span className="texto-suave">Identificado em {formatarDataIso(d.data_identificacao)}</span>
+                  </span>
+                  {realizada
+                    ? <SeloStatus tom={TOM_DO_STATUS[d.status]}>{ROTULO_STATUS[d.status]}</SeloStatus>
+                    : <SeloGravidade gravidade={d.gravidade} />}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {manutencao.observacao && (
         <section className="cartao" aria-label="Observação">
           <p className="cartao__titulo">Observação</p>
@@ -206,6 +229,11 @@ export default function ManutencaoDetalhePage() {
             {manutencao.total_fotos > 0 ? `, junto com ${manutencao.total_fotos === 1 ? "a foto ligada" : `as ${manutencao.total_fotos} fotos ligadas`} a ele` : ""}.
             {realizada && manutencao.quilometragem !== null
               ? " A leitura de quilometragem desta manutenção também é retirada." : ""}
+            {manutencao.diagnosticos.length > 0
+              ? (realizada
+                ? ` ${manutencao.diagnosticos.length === 1 ? "O diagnóstico resolvido por ela volta" : "Os diagnósticos resolvidos por ela voltam"} a ficar em aberto.`
+                : ` ${manutencao.diagnosticos.length === 1 ? "O diagnóstico ligado continua" : "Os diagnósticos ligados continuam"} em aberto, sem manutenção prevista.`)
+              : ""}
             {" "}Não dá para desfazer.
           </p>
         </DialogoConfirmacao>

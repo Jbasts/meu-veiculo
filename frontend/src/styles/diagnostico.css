@@ -1,0 +1,243 @@
+/* Diagnóstico (PDF, páginas 6 a 9): cartões dos problemas, detalhe com
+   anotações em linha do tempo, aviso de garantia e a faixa "Resolvendo". */
+
+/* ------------------------------------------------------------------- lista */
+
+.lista-diagnosticos {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+.diagnostico {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--cor-texto);
+  text-decoration: none;
+}
+
+.diagnostico__topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.diagnostico__sistema {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--cor-texto-suave);
+}
+
+.diagnostico__titulo {
+  margin-top: 4px;
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1.45rem;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.diagnostico__prevista {
+  font-weight: 600;
+  color: var(--cor-aviso-texto);
+}
+
+.diagnostico__rodape {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--cor-borda);
+}
+
+.diagnostico__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--cor-primaria);
+}
+
+.diagnostico__bolinha {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+}
+
+.diagnostico__orientacao {
+  margin: -8px 0 16px;
+}
+
+/* ----------------------------------------------------------------- detalhe */
+
+.dados-dupla {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 0 0 14px;
+}
+
+.dados-dupla dt {
+  font-size: 0.9rem;
+}
+
+.dados-dupla dd {
+  margin: 0;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.texto-com-linhas + .cartao,
+.dados-dupla + .cartao {
+  margin-top: 16px;
+}
+
+.caixa-diagnostico p {
+  margin: 0 0 8px;
+}
+
+.caixa-diagnostico--ok {
+  background: var(--cor-ok-fundo);
+  border-color: transparent;
+}
+
+.caixa-diagnostico--aviso {
+  background: var(--cor-aviso-fundo);
+  border-color: transparent;
+}
+
+.caixa-garantia {
+  display: flex;
+  gap: 12px;
+  background: var(--cor-ok-fundo);
+  border-color: transparent;
+  color: var(--cor-ok-texto);
+}
+
+.caixa-garantia svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.caixa-garantia p {
+  margin: 0;
+}
+
+.caixa-garantia__item {
+  margin: 4px 0 10px;
+}
+
+.caixa-garantia__item p {
+  color: var(--cor-texto);
+  margin-bottom: 6px;
+}
+
+.caixa-garantia__dica {
+  font-size: 0.9rem;
+}
+
+/* Anotações: linha do tempo com a mais recente em cima. */
+.linha-tempo {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+}
+
+.linha-tempo__item {
+  position: relative;
+  padding: 0 0 16px 26px;
+}
+
+.linha-tempo__item::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 6px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--cor-texto-suave);
+}
+
+.linha-tempo__item:first-child::before {
+  background: var(--cor-primaria);
+}
+
+.linha-tempo__item:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 22px;
+  bottom: 2px;
+  width: 2px;
+  background: var(--cor-borda);
+}
+
+.linha-tempo__data {
+  font-size: 0.9rem;
+}
+
+.linha-tempo__texto {
+  margin: 2px 0 0;
+}
+
+.linha-tempo__apagar {
+  margin-left: 0;
+  font-size: 0.9rem;
+}
+
+.nova-anotacao .campo:last-of-type {
+  margin-bottom: 12px;
+}
+
+/* "Marcar como em observação" e "Marcar como descartado": ações discretas. */
+.acoes-texto {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 24px;
+  margin: 14px 0 6px;
+}
+
+.acoes-texto .botao-link {
+  margin-left: 0;
+  color: var(--cor-texto-suave);
+}
+
+/* ------------------------------------------ formulário de manutenção (PDF 9) */
+
+.faixa-resolvendo {
+  background: var(--cor-ok-fundo);
+  border-color: transparent;
+}
+
+.faixa-resolvendo p {
+  margin: 0;
+}
+
+.faixa-resolvendo__rotulo {
+  font-size: 0.9rem;
+}
+
+.faixa-resolvendo__texto {
+  margin-top: 4px !important;
+  color: var(--cor-ok-texto);
+}
+
+/* Respiro entre o título e os dados, e entre "Adicionar anotação" e "Fotos". */
+.titulo-pagina--veiculo + .dados-dupla {
+  margin-top: 14px;
+}
+
+.linha-tempo ~ .botao--adicionar,
+.nova-anotacao,
+.titulo-secao + .texto-suave + .botao--adicionar {
+  margin-bottom: 26px;
+}

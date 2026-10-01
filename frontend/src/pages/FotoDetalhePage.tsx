@@ -100,8 +100,9 @@ export default function FotoDetalhePage() {
       return;
     }
     await enviar(async () => {
-      // O vínculo com a manutenção é mantido: aqui só mudam legenda e data.
-      mostrar(await editarFoto(veiculo!.id, foto!.id, legenda, data, foto!.manutencao_id));
+      // O vínculo (manutenção ou diagnóstico) é mantido: aqui só mudam legenda e data.
+      mostrar(await editarFoto(veiculo!.id, foto!.id, legenda, data, foto!.manutencao_id,
+        foto!.diagnostico_id));
       setSucesso("Alterações salvas.");
     });
   }
@@ -131,6 +132,23 @@ export default function FotoDetalhePage() {
               onClick={() => void executar(async () => {
                 mostrar(await editarFoto(veiculo.id, foto.id, foto.legenda ?? "", foto.data_foto, null));
                 setSucesso("A foto não está mais ligada à manutenção.");
+              })}>
+              Desligar
+            </button>
+          )}
+        </p>
+      )}
+      {foto.diagnostico_id !== null && (
+        <p className="foto-vinculo">
+          <span className="texto-suave">Ligada a um diagnóstico. </span>
+          <Link to={`/veiculos/${veiculo.id}/diagnosticos/${foto.diagnostico_id}`} className="link">
+            Ver diagnóstico
+          </Link>
+          {veiculo.ativo && (
+            <button type="button" className="botao-link" disabled={ocupado}
+              onClick={() => void executar(async () => {
+                mostrar(await editarFoto(veiculo.id, foto.id, foto.legenda ?? "", foto.data_foto, null, null));
+                setSucesso("A foto não está mais ligada ao diagnóstico.");
               })}>
               Desligar
             </button>

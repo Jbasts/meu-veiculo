@@ -395,6 +395,8 @@ npm run typecheck
 | Foto aparece como "Imagem indisponível" | o arquivo sumiu da pasta `backend\storage` | seção 11.5 |
 | Tela mostra `O banco de dados está na versão 0004 e o sistema precisa da 0005...` (HTTP 503) | o código foi atualizado com uma migration nova e o banco ainda não | `.\.venv\Scripts\python.exe gerenciar.py migrar` (pasta `backend`); não precisa reiniciar o backend (seção 12.5) |
 | `coluna ... não existe` (erro 500) no terminal do backend | mesma causa, em versão antiga do código sem o aviso 503 | `.\.venv\Scripts\python.exe gerenciar.py migrar` (pasta `backend`) |
+| Ao salvar a manutenção aparece "A data não pode ser anterior" | ela resolve um diagnóstico identificado depois dessa data | corrija a data da manutenção ou a do diagnóstico (seção 13.3) |
+| `gerenciar.py migrar` para na 0006 com uma lista de diagnósticos ou fotos | vínculos antigos entre veículos diferentes ou incoerentes | corrija os vínculos listados (seção 13.6); nada foi alterado |
 | `Com peças ou mão de obra detalhadas, o total é calculado automaticamente` | foi enviado um total junto com itens | normal: com itens, o total é a soma; tire os itens para informar só o total (seção 12.3) |
 | `A migration 0004 parou: ... está ligada ao plano ..., que é do veículo ...` | registro antigo ligado a plano ou manutenção de outro veículo | seção 12.6 |
 
@@ -677,3 +679,98 @@ Ela lista, por exemplo: `manutenção 8 (veículo 2) está ligada ao plano 5, qu
 errado e corrija à mão (o plano certo, ou deixe a manutenção avulsa com
 `plano_id` vazio). Não apague registros sem conferir. Depois rode de novo
 `gerenciar.py migrar`.
+
+## 13. Diagnóstico (problemas do veículo)
+
+### 13.1 Registrar um problema
+
+Na aba **Diagnóstico**, toque em **+** e conte o que está acontecendo
+("Barulho na suspensão dianteira"), os detalhes, o sistema e a gravidade:
+
+| Gravidade | Orientação mostrada |
+|---|---|
+| Baixa | Pode esperar a próxima revisão. |
+| Média | Resolver nas próximas semanas. |
+| Alta | Resolver o quanto antes. |
+| Crítica | Evite usar o veículo até resolver. |
+
+A data não pode ser no futuro. A quilometragem é opcional; se informada,
+vira uma leitura do hodômetro (como na manutenção) e precisa combinar com as
+outras leituras.
+
+### 13.2 Situações
+
+- **Aberto** e **Em observação**: o problema existe. "Em observação" é só um
+  lembrete de que está sendo acompanhado; os dois aparecem em **Abertos** e em
+  **Precisa de atenção**, no Início (dos mais graves para os menos graves).
+- **Resolvido**: resolvido por uma manutenção **realizada** do mesmo veículo.
+  A data de resolução é a data da manutenção.
+- **Descartado**: não era problema ou sumiu sozinho. O motivo é opcional.
+- **Reabrir** volta para aberto. A manutenção que tinha resolvido continua no
+  histórico, só deixa de estar ligada.
+
+A situação não é escolhida no formulário: ela muda pelos botões do detalhe.
+Cada mudança automática deixa uma anotação ("Resolvido com a manutenção...",
+"Reaberto: ...").
+
+### 13.3 Resolver com uma manutenção
+
+No detalhe do diagnóstico:
+
+- **Resolver com uma manutenção**: abre "Nova manutenção" com a faixa
+  "Resolvendo o diagnóstico" e o sistema já escolhido. Ao salvar:
+  - **Já foi feita** → a manutenção é gravada e o diagnóstico fica resolvido,
+    de uma vez só. Se qualquer parte falhar, nada é gravado.
+  - **Agendar** → a manutenção fica ligada como a prevista; o diagnóstico
+    continua aberto e é resolvido sozinho quando ela for marcada como realizada.
+- **Usar uma manutenção já registrada**: escolha uma manutenção do mesmo
+  veículo (realizada resolve; agendada fica como prevista).
+- A manutenção que resolve não pode ter data anterior à do problema.
+- Tocar duas vezes em salvar não cria duas manutenções: o segundo envio recebe
+  "Este diagnóstico já foi resolvido".
+
+O que acontece depois, pela manutenção:
+
+| Na manutenção | No diagnóstico |
+|---|---|
+| Agendada marcada como realizada | Resolvido, com a data dela |
+| Realizada volta para agendada | Reaberto (a manutenção continua ligada, como prevista) |
+| Realizada apagada | Reaberto, sem manutenção ligada |
+| Agendada apagada | Continua aberto, sem manutenção prevista |
+| Data da realizada alterada | A data de resolução acompanha |
+
+O detalhe e a edição da manutenção avisam disso antes de salvar ou apagar.
+
+### 13.4 Aviso de garantia
+
+Se uma manutenção realizada do **mesmo sistema** estava em garantia na data do
+problema (pela data ou pelo limite de km, o que vier primeiro), o detalhe
+mostra "Há peça em garantia neste sistema". É um aviso para conferir com a
+oficina, não uma garantia de cobertura. Garantia só por km, em problema sem
+quilometragem, não é mostrada (não dá para saber).
+
+### 13.5 Anotações e fotos
+
+- Anotações: texto e data (hoje, por padrão), da mais recente para a mais
+  antiga. Dá para apagar uma anotação.
+- Fotos: no detalhe, **Adicionar** abre "Nova foto" já ligada ao diagnóstico.
+  Na galeria, o filtro **Diagnósticos** mostra só essas. Uma foto fica ligada
+  a uma manutenção **ou** a um diagnóstico, nunca aos dois.
+- Apagar o diagnóstico apaga as anotações e as fotos dele (inclusive os
+  arquivos). A manutenção ligada continua registrada.
+
+Diagnóstico não tem valor próprio: o custo fica na manutenção que o resolveu.
+
+### 13.6 Se a migration 0006 parar por causa de vínculos antigos
+
+Ela lista, por exemplo:
+
+- `diagnóstico 4 (veículo 2) está ligado à manutenção 9, que é do veículo 3`;
+- `foto 12 (veículo 2) está ligada ao diagnóstico 4, que é do veículo 3`;
+- `diagnóstico 5 (resolvido) está ligado à manutenção 7, que está agendada`.
+
+Nada foi alterado. Confira no pgAdmin e corrija à mão: o vínculo certo, ou
+deixe `manutencao_id` / `diagnostico_id` vazio; para o terceiro caso, ou a
+manutenção foi mesmo feita (mude-a para `realizada`) ou o diagnóstico ainda
+está aberto (mude para `aberto` e deixe `data_resolucao` vazia). Não apague
+registros sem conferir. Depois rode de novo `gerenciar.py migrar`.

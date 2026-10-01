@@ -17,11 +17,13 @@ Acesso
   veículo. Conhecer o número ou o endereço de uma foto não dá acesso a ela.
 
 Vínculo
-- Uma foto pode ficar ligada a UMA manutenção (nota fiscal, peça trocada).
-  A manutenção precisa ser do mesmo veículo da foto: isso é conferido aqui
-  e garantido por chave estrangeira composta no banco. Os vínculos com
-  diagnóstico e projeto entram nas etapas desses módulos.
-- Ao apagar a manutenção, as fotos ligadas a ela são apagadas junto.
+- Uma foto pode ficar ligada a UMA manutenção (nota fiscal, peça trocada)
+  OU a UM diagnóstico (o vazamento, a peça com defeito); nunca aos dois.
+  O registro precisa ser do mesmo veículo da foto: isso é conferido aqui
+  e garantido por chave estrangeira composta no banco. O vínculo com
+  projeto entra na etapa desse módulo.
+- Ao apagar a manutenção ou o diagnóstico, as fotos ligadas a ele são
+  apagadas junto.
 
 Capa
 - No máximo uma por veículo (índice único no banco). A troca bloqueia a
@@ -74,7 +76,8 @@ def _legenda(texto: str | None) -> str | None:
 
 
 class FotoService:
-    def __init__(self, uow: Transacional, veiculos, fotos, arquivos, manutencoes, *,
+    def __init__(self, uow: Transacional, veiculos, fotos, arquivos, manutencoes, diagnosticos,
+                 *,
                  preparar: Callable[[bytes], ImagemPronta] = preparar_imagem,
                  hoje: Callable[[], date] = calendario.hoje):
         self._uow = uow
@@ -82,6 +85,7 @@ class FotoService:
         self._fotos = fotos
         self._arquivos = arquivos
         self._manutencoes = manutencoes
+        self._diagnosticos = diagnosticos
         self._acesso = AcessoVeiculo(veiculos)
         self._preparar = preparar
         self._hoje = hoje
@@ -108,18 +112,33 @@ class FotoService:
             raise DadosInvalidos("Manutenção não encontrada neste veículo.", campo="manutencao_id")
         return manutencao.id
 
+    def _vinculo(self, veiculo_id: int, manutencao_id: int | None,
+                 diagnostico_id: int | None) -> tuple[int | None, int | None]:
+        """Confere o vínculo: no máximo um registro, e do MESMO veículo."""
+        if manutencao_id is not None and diagnostico_id is not None:
+            raise DadosInvalidos("A foto pode ficar ligada a uma manutenção ou a um diagnóstico, "
+                                 "não aos dois.", campo="diagnostico_id")
+        if diagnostico_id is not None:
+            diagnostico = self._diagnosticos.buscar(diagnostico_id)
+            if diagnostico is None or diagnostico.veiculo_id != veiculo_id:
+                raise DadosInvalidos("Diagnóstico não encontrado neste veículo.",
+                                     campo="diagnostico_id")
+            return None, diagnostico.id
+        return self._manutencao_do_veiculo(veiculo_id, manutencao_id), None
+
     # ------------------------------------------------------------------ consulta
     def listar(self, usuario: Usuario, veiculo_id: int, pagina: int = 1, por_pagina: int = 30,
-               vinculo: str | None = None,
-               manutencao_id: int | None = None) -> Pagina[VeiculoFoto]:
-        """vinculo: None (todas), "manutencao" ou "nenhum"."""
+               vinculo: str | None = None, manutencao_id: int | None = None,
+               diagnostico_id: int | None = None) -> Pagina[VeiculoFoto]:
+        """vinculo: None (todas), "manutencao", "diagnostico" ou "nenhum"."""
         veiculo = self._acesso.exigir(usuario, veiculo_id)
-        if vinculo not in (None, "manutencao", "nenhum"):
+        if vinculo not in (None, "manutencao", "diagnostico", "nenhum"):
             raise DadosInvalidos("Filtro de fotos inválido.", campo="vinculo")
         pagina, por_pagina, limite, deslocamento = limite_e_deslocamento(pagina, por_pagina)
         return Pagina(
-            itens=self._fotos.listar(veiculo.id, limite, deslocamento, vinculo, manutencao_id),
-            total=self._fotos.contar(veiculo.id, vinculo, manutencao_id),
+            itens=self._fotos.listar(veiculo.id, limite, deslocamento, vinculo, manutencao_id,
+                                     diagnostico_id),
+            total=self._fotos.contar(veiculo.id, vinculo, manutencao_id, diagnostico_id),
             pagina=pagina, por_pagina=por_pagina,
         )
 
@@ -137,11 +156,12 @@ class FotoService:
     # ------------------------------------------------------------------ gravação
     def adicionar(self, usuario: Usuario, veiculo_id: int, conteudo: bytes,
                   legenda: str | None, data_foto: date | None, principal: bool,
-                  manutencao_id: int | None = None) -> VeiculoFoto:
+                  manutencao_id: int | None = None,
+                  diagnostico_id: int | None = None) -> VeiculoFoto:
         veiculo = self._acesso.exigir_para_alterar(usuario, veiculo_id)
         legenda = _legenda(legenda)
         data_foto = self._data(data_foto)
-        manutencao_id = self._manutencao_do_veiculo(veiculo.id, manutencao_id)
+        manutencao_id, diagnostico_id = self._vinculo(veiculo.id, manutencao_id, diagnostico_id)
         imagem = self._preparar(conteudo)
 
         caminho = f"veiculos/{veiculo.id}/{uuid.uuid4().hex}.{imagem.extensao}"
@@ -152,7 +172,7 @@ class FotoService:
                     self._veiculos.bloquear(veiculo.id)
                 foto = self._fotos.criar(veiculo.id, caminho, imagem.tipo_mime,
                                          len(imagem.conteudo), legenda, data_foto,
-                                         manutencao_id)
+                                         manutencao_id, diagnostico_id)
                 if principal:
                     self._fotos.definir_capa(veiculo.id, foto.id)
         except BaseException:
@@ -162,15 +182,16 @@ class FotoService:
         return foto
 
     def editar(self, usuario: Usuario, veiculo_id: int, foto_id: int, legenda: str | None,
-               data_foto: date | None, manutencao_id: int | None = None) -> VeiculoFoto:
-        """Atualiza legenda, data e vínculo (manutencao_id vazio = sem vínculo)."""
+               data_foto: date | None, manutencao_id: int | None = None,
+               diagnostico_id: int | None = None) -> VeiculoFoto:
+        """Atualiza legenda, data e vínculo (os dois ids vazios = sem vínculo)."""
         veiculo = self._acesso.exigir_para_alterar(usuario, veiculo_id)
         foto = self._foto_do_veiculo(veiculo.id, foto_id)
         legenda = _legenda(legenda)
         data_foto = self._data(data_foto)
-        manutencao_id = self._manutencao_do_veiculo(veiculo.id, manutencao_id)
+        manutencao_id, diagnostico_id = self._vinculo(veiculo.id, manutencao_id, diagnostico_id)
         with self._uow.transacao():
-            self._fotos.atualizar(foto, legenda, data_foto, manutencao_id)
+            self._fotos.atualizar(foto, legenda, data_foto, manutencao_id, diagnostico_id)
         return foto
 
     def definir_capa(self, usuario: Usuario, veiculo_id: int, foto_id: int) -> VeiculoFoto:

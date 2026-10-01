@@ -3,19 +3,35 @@ import { Link } from "react-router";
 
 import AvatarInicial from "../components/AvatarInicial";
 import { Carregando, ErroComNovaTentativa } from "../components/EstadoDaTela";
-import { IconeSeta, IconeSetaBaixo } from "../components/Icones";
+import { IconeDiagnostico, IconeSeta, IconeSetaBaixo } from "../components/Icones";
+import { TOM_DA_GRAVIDADE } from "../components/PecasDiagnostico";
 import { destinoDaPendencia, IconeDaSituacao, TOM_DA_SITUACAO } from "../components/PecasManutencao";
 import { Hodometro, Placa } from "../components/PecasVeiculo";
 import { useAuth } from "../contexts/AuthContext";
 import { useVeiculos } from "../contexts/VeiculosContext";
+import { listarDiagnosticos } from "../services/diagnosticoService";
 import { listarPendentes } from "../services/manutencaoService";
+import { rotuloGravidade, type DiagnosticoResumo } from "../types/diagnostico";
 import { resumoDoPrazo, type Pendencia } from "../types/manutencao";
 import { formatarDataIso } from "../utils/datas";
 
-/** "Precisa de atenção": manutenções atrasadas e próximas do veículo em uso. */
-function AlertasDeManutencao({ veiculoId }: { veiculoId: number }) {
+const MAXIMO_DE_ALERTAS = 5;
+
+/** "Diagnóstico aberto, gravidade média" */
+function textoDoDiagnostico(d: DiagnosticoResumo): string {
+  return `Diagnóstico ${d.status === "em_observacao" ? "em observação" : "aberto"}, `
+    + `gravidade ${rotuloGravidade(d.gravidade).toLowerCase()}`;
+}
+
+/**
+ * "Precisa de atenção": manutenções atrasadas e próximas e problemas em
+ * aberto do veículo em uso. Cada fonte falha sozinha, sem esconder a outra.
+ */
+function PrecisaDeAtencao({ veiculoId }: { veiculoId: number }) {
   const [itens, setItens] = useState<Pendencia[] | null>(null);
   const [falhou, setFalhou] = useState(false);
+  const [problemas, setProblemas] = useState<{ itens: DiagnosticoResumo[]; total: number } | null>(null);
+  const [falhouProblemas, setFalhouProblemas] = useState(false);
 
   useEffect(() => {
     let cancelado = false;
@@ -28,20 +44,65 @@ function AlertasDeManutencao({ veiculoId }: { veiculoId: number }) {
       .catch(() => {
         if (!cancelado) setFalhou(true);
       });
+    // Os abertos vêm dos mais graves para os menos graves.
+    listarDiagnosticos(veiculoId, "abertos", 1, MAXIMO_DE_ALERTAS)
+      .then((pagina) => {
+        if (!cancelado) setProblemas({ itens: pagina.itens, total: pagina.total });
+      })
+      .catch(() => {
+        if (!cancelado) setFalhouProblemas(true);
+      });
     return () => {
       cancelado = true;
     };
   }, [veiculoId]);
 
-  if (falhou) {
-    return <p className="texto-suave">Não foi possível carregar os alertas de manutenção.</p>;
-  }
-  if (itens === null || itens.length === 0) return null;
+  const temManutencao = itens !== null && itens.length > 0;
+  const temProblema = problemas !== null && problemas.total > 0;
   return (
-    <section aria-label="Precisa de atenção">
-      <h2 className="titulo-secao">Precisa de atenção</h2>
-      <ul className="cartao lista-simples">
-        {itens.slice(0, 5).map((item) => {
+    <>
+      {falhou && <p className="texto-suave">Não foi possível carregar os alertas de manutenção.</p>}
+      {falhouProblemas && <p className="texto-suave">Não foi possível carregar os diagnósticos em aberto.</p>}
+      {(temManutencao || temProblema) && (
+        <section aria-label="Precisa de atenção">
+          <h2 className="titulo-secao">Precisa de atenção</h2>
+          {temManutencao && <AlertasDeManutencao veiculoId={veiculoId} itens={itens} />}
+          {temProblema && (
+            <>
+              <ul className="cartao lista-simples" aria-label="Diagnósticos em aberto">
+                {problemas.itens.map((d) => (
+                  <li key={d.id}>
+                    <Link to={`/veiculos/${veiculoId}/diagnosticos/${d.id}`} className="lista-simples__item">
+                      <span className={`pendencia__icone pendencia__icone--${TOM_DA_GRAVIDADE[d.gravidade]}`}>
+                        <IconeDiagnostico />
+                      </span>
+                      <span className="lista-simples__texto">
+                        <span className="lista-simples__titulo">{d.titulo}</span>
+                        <span className="texto-suave">{textoDoDiagnostico(d)}</span>
+                      </span>
+                      <IconeSeta tamanho={20} />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              {problemas.total > problemas.itens.length && (
+                <p className="link-direita">
+                  <Link to="/diagnostico" className="link">Ver todos os diagnósticos ({problemas.total})</Link>
+                </p>
+              )}
+            </>
+          )}
+        </section>
+      )}
+    </>
+  );
+}
+
+function AlertasDeManutencao({ veiculoId, itens }: { veiculoId: number; itens: Pendencia[] }) {
+  return (
+    <>
+      <ul className="cartao lista-simples" aria-label="Manutenções">
+        {itens.slice(0, MAXIMO_DE_ALERTAS).map((item) => {
           const resumo = resumoDoPrazo(item);
           return (
             <li key={`${item.tipo}-${item.plano_id ?? item.manutencao_id}`}>
@@ -59,18 +120,18 @@ function AlertasDeManutencao({ veiculoId }: { veiculoId: number }) {
           );
         })}
       </ul>
-      {itens.length > 5 && (
+      {itens.length > MAXIMO_DE_ALERTAS && (
         <p className="link-direita">
           <Link to="/manutencao" className="link">Ver todas ({itens.length})</Link>
         </p>
       )}
-    </section>
+    </>
   );
 }
 
-// Tela inicial (PDF, página 2). Nesta etapa mostra o veículo em uso e a
-// quilometragem e os alertas de manutenção. Os atalhos, os diagnósticos e os
-// indicadores de gastos e consumo entram com os módulos correspondentes.
+// Tela inicial (PDF, página 2). Mostra o veículo em uso, a quilometragem, os
+// alertas de manutenção e os problemas em aberto. Os atalhos e os indicadores
+// de gastos e consumo entram com os módulos correspondentes.
 export default function InicioPage() {
   const { usuario } = useAuth();
   const { carregando, erro, veiculos, emUso, recarregar } = useVeiculos();
@@ -140,13 +201,13 @@ export default function InicioPage() {
         </div>
       </section>
 
-      <AlertasDeManutencao key={emUso.id} veiculoId={emUso.id} />
+      <PrecisaDeAtencao key={emUso.id} veiculoId={emUso.id} />
 
       <section className="cartao">
         <p className="cartao__titulo">Em construção</p>
         <p className="texto-suave">
-          Os atalhos, os diagnósticos pendentes e os indicadores de gastos e consumo aparecem aqui
-          quando esses módulos ficarem prontos. Nada é mostrado com valores de exemplo.
+          Os atalhos e os indicadores de gastos e consumo aparecem aqui quando esses módulos
+          ficarem prontos. Nada é mostrado com valores de exemplo.
         </p>
       </section>
 

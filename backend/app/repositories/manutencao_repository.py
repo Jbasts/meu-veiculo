@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.entities.manutencao import (
     STATUS_AGENDADA,
+    STATUS_REALIZADA,
     TIPO_AGENDADA,
     TIPO_LEMBRETE,
     TIPO_PLANO,
@@ -158,6 +159,16 @@ class ManutencaoRepository:
         """Os itens saem junto (ON DELETE CASCADE no banco)."""
         self._sessao.delete(manutencao)
         self._sessao.flush()
+
+    def com_garantia(self, veiculo_id: int, sistema: str) -> list[Manutencao]:
+        """Manutenções realizadas do sistema que têm algum limite de garantia informado."""
+        return list(self._sessao.scalars(
+            select(Manutencao).where(
+                Manutencao.veiculo_id == veiculo_id, Manutencao.sistema == sistema,
+                Manutencao.status == STATUS_REALIZADA,
+                (Manutencao.garantia_ate.is_not(None)) | (Manutencao.garantia_km.is_not(None)),
+            ).order_by(Manutencao.data.desc(), Manutencao.id.desc())
+        ))
 
     def itens(self, manutencao_id: int) -> list[ManutencaoItem]:
         """Peças e mão de obra, na ordem em que foram informadas."""

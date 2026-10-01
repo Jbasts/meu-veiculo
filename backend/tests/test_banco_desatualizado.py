@@ -10,6 +10,7 @@ from alembic import command
 from app.banco.migracoes import config_alembic, versao_mais_recente
 from app.banco.versao import esquecer_conferencias
 from tests.auth_utils import executar_sql, valor_sql
+from tests.test_migracoes import TODAS
 from tests.veiculo_utils import banco, dados_veiculo, pasta_fotos, paula  # noqa: F401  (fixtures)
 
 
@@ -44,7 +45,8 @@ def test_banco_atrasado_responde_503_explicando_o_que_fazer(banco, paula, confer
     # A tela "Situação do sistema" continua mostrando o que falta.
     saude = paula.get("/api/saude")
     assert saude.status_code == 200
-    assert saude.json()["migracoes_pendentes"] == [ultima]
+    # Todas as que vêm depois da 0004 (não só a última).
+    assert saude.json()["migracoes_pendentes"] == TODAS[TODAS.index("0004") + 1:]
 
 
 def test_migrar_com_o_backend_ligado_volta_a_funcionar_sem_reiniciar(banco, paula, conferencia_limpa):

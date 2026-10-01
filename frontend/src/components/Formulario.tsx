@@ -126,15 +126,22 @@ export function DialogoConfirmacao({ titulo, children, textoConfirmar, perigo = 
   ocupado = false, aoConfirmar, aoCancelar }: PropsDialogo) {
   const id = useId();
   const botaoCancelar = useRef<HTMLButtonElement>(null);
+  const cancelar = useRef(aoCancelar);
+  useEffect(() => {
+    cancelar.current = aoCancelar;
+  });
 
+  // Só ao abrir: o foco vai para "Cancelar" (a opção segura). Se isso rodasse
+  // a cada nova renderização, o foco sairia do campo que a pessoa está
+  // digitando (ex.: o motivo do descarte).
   useEffect(() => {
     botaoCancelar.current?.focus();
     const aoTeclar = (evento: KeyboardEvent) => {
-      if (evento.key === "Escape") aoCancelar();
+      if (evento.key === "Escape") cancelar.current();
     };
     window.addEventListener("keydown", aoTeclar);
     return () => window.removeEventListener("keydown", aoTeclar);
-  }, [aoCancelar]);
+  }, []);
 
   return (
     <div className="dialogo__fundo">

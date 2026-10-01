@@ -6,6 +6,7 @@ import "@fontsource/barlow-condensed/700.css";
 import "./styles/tema.css";
 import "./styles/veiculos.css";
 import "./styles/manutencao.css";
+import "./styles/diagnostico.css";
 
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";

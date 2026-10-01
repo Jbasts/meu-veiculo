@@ -12,12 +12,14 @@ import { useVeiculos } from "../contexts/VeiculosContext";
 import { useEnvioFormulario } from "../hooks/useEnvioFormulario";
 import { useVeiculoDaRota } from "../hooks/useVeiculoDaRota";
 import { ErroDaApi } from "../services/apiCliente";
+import { obterDiagnostico, resolverComNovaManutencao } from "../services/diagnosticoService";
 import {
   criarManutencao,
   editarManutencao,
   listarPlanos,
   obterManutencao,
 } from "../services/manutencaoService";
+import { emAberto, type DiagnosticoDetalhe } from "../types/diagnostico";
 import {
   SISTEMAS,
   textoIntervalo,
@@ -93,13 +95,18 @@ function camposDe(m: ManutencaoDetalhe): Campos {
 }
 
 /** "Nova manutenção" (PDF, página 9) e edição. ?plano=ID já escolhe o plano;
- *  ?concluir=1 abre a agendada pronta para ser marcada como realizada. */
+ *  ?concluir=1 abre a agendada pronta para ser marcada como realizada;
+ *  ?diagnostico=ID registra a manutenção que resolve aquele diagnóstico. */
 export default function ManutencaoFormPage() {
   const { veiculo, carregando, erro, recarregar } = useVeiculoDaRota();
   const { manutencaoId } = useParams();
+  const [parametros] = useSearchParams();
   const idManutencao = manutencaoId ? Number(manutencaoId) : null;
+  const idDiagnostico = !idManutencao && parametros.get("diagnostico")
+    ? Number(parametros.get("diagnostico")) : null;
   const [planos, setPlanos] = useState<Plano[] | null>(null);
   const [existente, setExistente] = useState<ManutencaoDetalhe | null>(null);
+  const [diagnostico, setDiagnostico] = useState<DiagnosticoDetalhe | null>(null);
   const [erroDados, setErroDados] = useState<string | null>(null);
 
   useEffect(() => {
@@ -108,10 +115,12 @@ export default function ManutencaoFormPage() {
     Promise.all([
       listarPlanos(veiculo.id),
       idManutencao ? obterManutencao(veiculo.id, idManutencao) : Promise.resolve(null),
-    ]).then(([lista, manutencao]) => {
+      idDiagnostico ? obterDiagnostico(veiculo.id, idDiagnostico) : Promise.resolve(null),
+    ]).then(([lista, manutencao, problema]) => {
       if (cancelado) return;
       setPlanos(lista);
       setExistente(manutencao);
+      setDiagnostico(problema);
       setErroDados(null);
     }).catch((falha) => {
       if (!cancelado) {
@@ -121,10 +130,11 @@ export default function ManutencaoFormPage() {
     return () => {
       cancelado = true;
     };
-  }, [veiculo, idManutencao]);
+  }, [veiculo, idManutencao, idDiagnostico]);
 
   const titulo = idManutencao ? "Editar manutenção" : "Nova manutenção";
-  if (carregando || (veiculo && !erroDados && (planos === null || (idManutencao && !existente)))) {
+  if (carregando || (veiculo && !erroDados && (planos === null || (idManutencao && !existente)
+    || (idDiagnostico && !diagnostico)))) {
     return <div className="pagina"><main className="conteudo conteudo--topo"><Carregando /></main></div>;
   }
   if (erro || erroDados || !veiculo || planos === null) {
@@ -139,11 +149,35 @@ export default function ManutencaoFormPage() {
     );
   }
   return <Formulario key={existente?.id ?? "nova"} veiculo={veiculo} planos={planos}
-    existente={existente} titulo={titulo} />;
+    existente={existente} diagnostico={diagnostico} titulo={titulo} />;
 }
 
-function Formulario({ veiculo, planos, existente, titulo }: {
-  veiculo: Veiculo; planos: Plano[]; existente: ManutencaoDetalhe | null; titulo: string;
+/** Aviso na edição: o que acontece com os diagnósticos ligados a esta manutenção. */
+function AvisoDiagnosticos({ existente, realizada }: { existente: ManutencaoDetalhe; realizada: boolean }) {
+  if (existente.diagnosticos.length === 0) return null;
+  const nomes = existente.diagnosticos.map((d) => `“${d.titulo}”`).join(", ");
+  const um = existente.diagnosticos.length === 1;
+  if (existente.status === "realizada") {
+    return (
+      <Alerta tipo={realizada ? "info" : "erro"}>
+        {realizada
+          ? `Esta manutenção resolveu ${um ? "o diagnóstico" : "os diagnósticos"} ${nomes}.`
+          : `Ao salvar como agendada, ${um ? "o diagnóstico" : "os diagnósticos"} ${nomes} ${um ? "volta" : "voltam"} a ficar ${um ? "aberto" : "abertos"}.`}
+      </Alerta>
+    );
+  }
+  return (
+    <Alerta tipo="info">
+      {realizada
+        ? `Ao salvar como realizada, ${um ? "o diagnóstico" : "os diagnósticos"} ${nomes} ${um ? "será marcado como resolvido" : "serão marcados como resolvidos"}.`
+        : `Esta manutenção está prevista para resolver ${um ? "o diagnóstico" : "os diagnósticos"} ${nomes}.`}
+    </Alerta>
+  );
+}
+
+function Formulario({ veiculo, planos, existente, diagnostico, titulo }: {
+  veiculo: Veiculo; planos: Plano[]; existente: ManutencaoDetalhe | null;
+  diagnostico: DiagnosticoDetalhe | null; titulo: string;
 }) {
   const navegar = useNavigate();
   const [parametros] = useSearchParams();
@@ -163,7 +197,8 @@ function Formulario({ veiculo, planos, existente, titulo }: {
     const plano = planos.find((p) => String(p.id) === parametros.get("plano") && p.ativo);
     return {
       status: parametros.get("status") === "agendada" ? "agendada" : "realizada",
-      descricao: plano?.nome ?? "", sistema: plano?.sistema ?? "outros",
+      // Resolvendo um diagnóstico: o sistema vem dele.
+      descricao: plano?.nome ?? "", sistema: plano?.sistema ?? diagnostico?.sistema ?? "outros",
       planoId: plano ? String(plano.id) : "", data: hoje, km: "", valor: "", oficina: "",
       garantiaAte: "", garantiaKm: "", proximaData: "", proximaKm: "", observacao: "",
     };
@@ -283,29 +318,46 @@ function Formulario({ veiculo, planos, existente, titulo }: {
       })),
     };
     let destino = "";
+    let aviso = existente ? "Alterações salvas." : realizada ? "Manutenção registrada." : "Manutenção agendada.";
     const deuCerto = await enviar(async () => {
-      const salva = existente
-        ? await editarManutencao(veiculo.id, existente.id, dados)
-        : await criarManutencao(veiculo.id, dados);
-      destino = `/veiculos/${veiculo.id}/manutencoes/${salva.id}`;
+      if (diagnostico) {
+        // A manutenção e a resolução são gravadas juntas pelo backend (ou nenhuma das duas).
+        await resolverComNovaManutencao(veiculo.id, diagnostico.id, dados);
+        destino = `/veiculos/${veiculo.id}/diagnosticos/${diagnostico.id}`;
+        aviso = realizada ? "Manutenção registrada e diagnóstico resolvido."
+          : "Manutenção agendada. O diagnóstico será resolvido quando ela for marcada como realizada.";
+      } else {
+        const salva = existente
+          ? await editarManutencao(veiculo.id, existente.id, dados)
+          : await criarManutencao(veiculo.id, dados);
+        destino = `/veiculos/${veiculo.id}/manutencoes/${salva.id}`;
+      }
       await recarregarLista(); // a quilometragem do veículo pode ter mudado
     });
-    if (deuCerto) {
-      navegar(destino, {
-        replace: true,
-        state: { mensagem: existente ? "Alterações salvas." : realizada ? "Manutenção registrada." : "Manutenção agendada." },
-      });
-    }
+    if (deuCerto) navegar(destino, { replace: true, state: { mensagem: aviso } });
   }
 
   const voltar = existente
     ? `/veiculos/${veiculo.id}/manutencoes/${existente.id}`
-    : `/veiculos/${veiculo.id}/manutencoes`;
+    : diagnostico ? `/veiculos/${veiculo.id}/diagnosticos/${diagnostico.id}`
+      : `/veiculos/${veiculo.id}/manutencoes`;
 
   return (
     <div className="pagina">
       <main className="conteudo conteudo--topo">
         <TopoComVoltar titulo={titulo} voltarPara={voltar} />
+        {diagnostico && (
+          <section className="cartao faixa-resolvendo" aria-label="Resolvendo o diagnóstico">
+            <p className="texto-suave faixa-resolvendo__rotulo">Resolvendo o diagnóstico</p>
+            <p className="cartao__titulo">{diagnostico.titulo}</p>
+            <p className="faixa-resolvendo__texto">
+              {!emAberto(diagnostico.status) ? "Este diagnóstico já está encerrado."
+                : realizada ? "Ao salvar, ele será marcado como resolvido."
+                  : "Ao salvar como agendada, ele continua aberto e será resolvido quando a manutenção for marcada como realizada."}
+            </p>
+          </section>
+        )}
+        {existente && <AvisoDiagnosticos existente={existente} realizada={realizada} />}
         {erroGeral && <Alerta tipo="erro">{erroGeral}</Alerta>}
 
         <form onSubmit={aoEnviar} noValidate>

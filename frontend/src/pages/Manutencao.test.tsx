@@ -49,7 +49,7 @@ const MANUTENCAO: ManutencaoDetalhe = {
   oficina: "Oficina do Zé", garantia_ate: "2026-12-24", garantia_km: null, proxima_data: null,
   proxima_km: null, observacao: null, criado_em: "2026-09-24T10:00:00-03:00", plano_nome: null,
   garantia_situacao: "vigente", garantia_explicacao: "Em garantia até 24/12/2026.", total_fotos: 0,
-  itens: [], total_pecas: null, total_mao_de_obra: null,
+  itens: [], total_pecas: null, total_mao_de_obra: null, diagnosticos: [],
 };
 
 /** O exemplo da Paula: 70 + 45 de peças, 20 + 30 de mão de obra. */
@@ -71,6 +71,9 @@ const BASE = {
   "GET /api/veiculos/7": () => json(200, CIVIC),
   [PENDENTES]: () => json(200, { km_atual: 85000, itens: [] }),
   "GET /api/veiculos/7/planos": () => json(200, [PLANO]),
+  // Início: nenhum diagnóstico em aberto.
+  "GET /api/veiculos/7/diagnosticos?filtro=abertos&pagina=1&por_pagina=5": () => json(200, {
+    itens: [], total: 0, pagina: 1, por_pagina: 5 }),
 };
 
 function corpoJson(buscar: ReturnType<typeof apiFalsa>, chave: string) {

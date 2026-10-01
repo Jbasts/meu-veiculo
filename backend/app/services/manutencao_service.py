@@ -46,6 +46,13 @@ Valores: peças e mão de obra
   (desconhecido, não zero): nada é inventado para registros antigos.
 - A edição troca a lista inteira de itens, na mesma transação do resto.
 
+Diagnósticos ligados (migration 0006; o banco faz a mudança de situação)
+- Manutenção agendada ligada a um diagnóstico é a prevista para resolvê-lo:
+  ao virar realizada, o diagnóstico é resolvido (com a data dela).
+- Manutenção realizada que resolveu um diagnóstico: voltar para agendada ou
+  apagar reabre o diagnóstico. Uma anotação registra cada mudança automática.
+- A data da manutenção que resolve não pode ser anterior à do diagnóstico.
+
 Garantia
 - garantia_ate: último dia de cobertura. garantia_km: LIMITE DO HODÔMETRO
   (ex.: "até os 95.000 km"), não uma distância.
@@ -59,6 +66,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Callable, Protocol
 
+from app.entities.diagnostico import RESOLVIDO, Diagnostico
 from app.entities.manutencao import (
     ITEM_MAO_DE_OBRA,
     ITEM_PECA,
@@ -126,6 +134,7 @@ class ManutencaoDetalhe:
     # None quando a manutenção não tem itens (só o total, sem detalhamento).
     total_pecas: Decimal | None
     total_mao_de_obra: Decimal | None
+    diagnosticos: list[Diagnostico]  # resolvidos por ela, ou à espera dela (agendada)
 
 
 def somar(valores) -> Decimal:
@@ -286,8 +295,9 @@ class PlanoService:
 
 class ManutencaoService:
     def __init__(self, uow: Transacional, veiculos, planos, manutencoes, leituras, fotos,
-                 arquivos, *, hoje: Callable[[], date] = calendario.hoje):
+                 arquivos, diagnosticos, *, hoje: Callable[[], date] = calendario.hoje):
         self._uow = uow
+        self._diagnosticos = diagnosticos
         self._veiculos = veiculos
         self._planos = planos
         self._manutencoes = manutencoes
@@ -316,6 +326,7 @@ class ManutencaoService:
             total_pecas=somar(i.valor for i in itens if i.tipo == ITEM_PECA) if itens else None,
             total_mao_de_obra=(somar(i.valor for i in itens if i.tipo == ITEM_MAO_DE_OBRA)
                                if itens else None),
+            diagnosticos=self._diagnosticos.ligados_a_manutencao(manutencao.id),
         )
 
     # ------------------------------------------------------------------ consulta
@@ -509,15 +520,52 @@ class ManutencaoService:
                 campo="quilometragem")
 
     # ------------------------------------------------------------------ gravação
+    def registrar(self, veiculo: Veiculo, dados: dict) -> Manutencao:
+        """Valida e grava uma manutenção nova SEM abrir transação: quem chama
+        (criar, ou a resolução de um diagnóstico) controla a transação e já
+        bloqueou o veículo."""
+        limpos, itens = self._validar(veiculo, dados, None)
+        manutencao = self._manutencoes.criar(veiculo.id, limpos)
+        if itens:
+            self._manutencoes.substituir_itens(manutencao.id, itens)
+        return manutencao
+
+    def detalhar(self, veiculo: Veiculo, manutencao: Manutencao) -> ManutencaoDetalhe:
+        return self._detalhar(veiculo, manutencao)
+
     def criar(self, usuario: Usuario, veiculo_id: int, dados: dict) -> ManutencaoDetalhe:
         with self._uow.transacao():
             veiculo = self._acesso.exigir_para_alterar(usuario, veiculo_id, bloquear=True)
-            limpos, itens = self._validar(veiculo, dados, None)
-            manutencao = self._manutencoes.criar(veiculo.id, limpos)
-            if itens:
-                self._manutencoes.substituir_itens(manutencao.id, itens)
+            manutencao = self.registrar(veiculo, dados)
             self._veiculos.recarregar(veiculo)  # o banco pode ter atualizado a quilometragem
         return self._detalhar(veiculo, manutencao)
+
+    def _conferir_data_dos_diagnosticos(self, ligados: list[Diagnostico], dados: dict) -> None:
+        """A manutenção realizada que resolve um diagnóstico não pode ser anterior a ele."""
+        data = dados.get("data")
+        if dados.get("status") != STATUS_REALIZADA or data is None:
+            return
+        for diagnostico in ligados:
+            if data < diagnostico.data_identificacao:
+                raise DadosInvalidos(
+                    f"Esta manutenção resolve o diagnóstico \"{diagnostico.titulo}\", identificado "
+                    f"em {data_br(diagnostico.data_identificacao)}. A data não pode ser anterior.",
+                    campo="data")
+
+    def _anotar_mudancas(self, manutencao: Manutencao, antes: dict[int, str],
+                         ligados: list[Diagnostico]) -> None:
+        """Anotação no diagnóstico quando a manutenção o resolveu ou reabriu."""
+        for diagnostico in ligados:
+            self._diagnosticos.recarregar(diagnostico)  # o trigger pode ter mudado a situação
+            estava = antes.get(diagnostico.id)
+            if estava != RESOLVIDO and diagnostico.status == RESOLVIDO:
+                texto = f"Resolvido com a manutenção \"{manutencao.descricao}\"."
+            elif estava == RESOLVIDO and diagnostico.status != RESOLVIDO:
+                texto = (f"Reaberto: a manutenção \"{manutencao.descricao}\" voltou a ficar "
+                         "agendada.")
+            else:
+                continue
+            self._diagnosticos.criar_nota(diagnostico.id, self._hoje(), texto)
 
     def editar(self, usuario: Usuario, veiculo_id: int, manutencao_id: int,
                dados: dict) -> ManutencaoDetalhe:
@@ -525,9 +573,13 @@ class ManutencaoService:
             veiculo = self._acesso.exigir_para_alterar(usuario, veiculo_id, bloquear=True)
             manutencao = self._do_veiculo(veiculo, manutencao_id)
             limpos, itens = self._validar(veiculo, dados, manutencao)
+            ligados = self._diagnosticos.ligados_a_manutencao(manutencao.id)
+            self._conferir_data_dos_diagnosticos(ligados, limpos)
+            antes = {d.id: d.status for d in ligados}
             # Primeiro os itens, depois o total: o banco confere que batem.
             self._manutencoes.substituir_itens(manutencao.id, itens)
             self._manutencoes.atualizar(manutencao, limpos)
+            self._anotar_mudancas(manutencao, antes, ligados)
             self._veiculos.recarregar(veiculo)
         return self._detalhar(veiculo, manutencao)
 
@@ -536,6 +588,12 @@ class ManutencaoService:
         with self._uow.transacao():
             veiculo = self._acesso.exigir_para_alterar(usuario, veiculo_id, bloquear=True)
             manutencao = self._do_veiculo(veiculo, manutencao_id)
+            # O banco reabre o diagnóstico resolvido por ela (migration 0006).
+            for diagnostico in self._diagnosticos.ligados_a_manutencao(manutencao.id):
+                texto = (f"Reaberto: a manutenção \"{manutencao.descricao}\" foi apagada."
+                         if diagnostico.status == RESOLVIDO else
+                         f"A manutenção agendada \"{manutencao.descricao}\" foi apagada.")
+                self._diagnosticos.criar_nota(diagnostico.id, self._hoje(), texto)
             # O banco apaga as linhas das fotos em cascata, mas não os arquivos.
             arquivos = self._fotos.arquivos_da_manutencao(manutencao.id)
             self._manutencoes.apagar(manutencao)

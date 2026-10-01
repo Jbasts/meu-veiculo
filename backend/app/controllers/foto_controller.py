@@ -20,9 +20,10 @@ class FotoController:
         self._service = service
 
     def listar(self, atual: SessaoAtual, veiculo_id: int, pagina: int, por_pagina: int,
-               vinculo: str | None, manutencao_id: int | None) -> PaginaFotos:
+               vinculo: str | None, manutencao_id: int | None,
+               diagnostico_id: int | None = None) -> PaginaFotos:
         resultado = self._service.listar(atual.usuario, veiculo_id, pagina, por_pagina,
-                                         vinculo, manutencao_id)
+                                         vinculo, manutencao_id, diagnostico_id)
         return PaginaFotos(
             itens=[FotoResposta.model_validate(foto) for foto in resultado.itens],
             total=resultado.total, pagina=resultado.pagina, por_pagina=resultado.por_pagina,
@@ -33,18 +34,18 @@ class FotoController:
 
     def adicionar(self, atual: SessaoAtual, veiculo_id: int, arquivo: UploadFile,
                   legenda: str | None, data_foto: date | None, principal: bool,
-                  manutencao_id: int | None) -> FotoResposta:
+                  manutencao_id: int | None, diagnostico_id: int | None = None) -> FotoResposta:
         # Lê no máximo o limite + 1 byte: o suficiente para o service saber
         # que passou do limite, sem carregar um arquivo enorme na memória.
         conteudo = arquivo.file.read(TAMANHO_MAXIMO_BYTES + 1)
         foto = self._service.adicionar(atual.usuario, veiculo_id, conteudo, legenda, data_foto,
-                                       principal, manutencao_id)
+                                       principal, manutencao_id, diagnostico_id)
         return FotoResposta.model_validate(foto)
 
     def editar(self, atual: SessaoAtual, veiculo_id: int, foto_id: int,
                dados: FotoEdicaoEntrada) -> FotoResposta:
         foto = self._service.editar(atual.usuario, veiculo_id, foto_id, dados.legenda,
-                                    dados.data_foto, dados.manutencao_id)
+                                    dados.data_foto, dados.manutencao_id, dados.diagnostico_id)
         return FotoResposta.model_validate(foto)
 
     def definir_capa(self, atual: SessaoAtual, veiculo_id: int, foto_id: int) -> FotoResposta:

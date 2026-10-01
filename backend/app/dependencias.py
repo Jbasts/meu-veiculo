@@ -30,12 +30,14 @@ from app.banco.sessao import UnidadeDeTrabalho, abrir_sessao
 from app.banco.versao import problema_de_versao
 from app.config import Configuracoes, obter_configuracoes
 from app.controllers.auth_controller import AuthController, ConfigCookie, ler_token
+from app.controllers.diagnostico_controller import DiagnosticoController
 from app.controllers.foto_controller import FotoController
 from app.controllers.manutencao_controller import ManutencaoController
 from app.controllers.saude_controller import SaudeController
 from app.controllers.veiculo_controller import VeiculoController
 from app.entities.sessao import SessaoAtual
 from app.repositories.arquivo_foto_repository import ArquivoFotoRepository
+from app.repositories.diagnostico_repository import DiagnosticoRepository
 from app.repositories.foto_repository import FotoRepository
 from app.repositories.leitura_km_repository import LeituraKmRepository
 from app.repositories.manutencao_repository import ManutencaoRepository, PlanoRepository
@@ -46,6 +48,7 @@ from app.repositories.tentativa_acesso_repository import TentativaAcessoReposito
 from app.repositories.usuario_repository import UsuarioRepository
 from app.repositories.veiculo_repository import VeiculoRepository
 from app.services.autenticacao_service import AutenticacaoService
+from app.services.diagnostico_service import DiagnosticoService
 from app.services.email_service import EnviadorEmail, criar_enviador
 from app.services.erros import AcessoNegado, ServicoIndisponivel
 from app.services.foto_service import FotoService
@@ -132,8 +135,16 @@ def obter_foto_controller(
 ) -> FotoController:
     return FotoController(FotoService(
         UnidadeDeTrabalho(sessao), VeiculoRepository(sessao), FotoRepository(sessao), arquivos,
-        ManutencaoRepository(sessao),
+        ManutencaoRepository(sessao), DiagnosticoRepository(sessao),
     ))
+
+
+def _manutencao_service(sessao: Session, uow: UnidadeDeTrabalho, veiculos: VeiculoRepository,
+                        planos: PlanoRepository,
+                        arquivos: ArquivoFotoRepository) -> ManutencaoService:
+    return ManutencaoService(uow, veiculos, planos, ManutencaoRepository(sessao),
+                             LeituraKmRepository(sessao), FotoRepository(sessao), arquivos,
+                             DiagnosticoRepository(sessao))
 
 
 def obter_manutencao_controller(
@@ -145,9 +156,21 @@ def obter_manutencao_controller(
     planos = PlanoRepository(sessao)
     return ManutencaoController(
         PlanoService(uow, veiculos, planos),
-        ManutencaoService(uow, veiculos, planos, ManutencaoRepository(sessao),
-                          LeituraKmRepository(sessao), FotoRepository(sessao), arquivos),
+        _manutencao_service(sessao, uow, veiculos, planos, arquivos),
     )
+
+
+def obter_diagnostico_controller(
+    sessao: SessaoDep,
+    arquivos: Annotated[ArquivoFotoRepository, Depends(obter_arquivos_de_foto)],
+) -> DiagnosticoController:
+    uow = UnidadeDeTrabalho(sessao)
+    veiculos = VeiculoRepository(sessao)
+    return DiagnosticoController(DiagnosticoService(
+        uow, veiculos, DiagnosticoRepository(sessao), ManutencaoRepository(sessao),
+        LeituraKmRepository(sessao), FotoRepository(sessao), arquivos,
+        _manutencao_service(sessao, uow, veiculos, PlanoRepository(sessao), arquivos),
+    ))
 
 
 # --------------------------------------------------------------------- proteções

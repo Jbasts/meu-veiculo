@@ -13,20 +13,35 @@ import { useEnvioFormulario } from "../hooks/useEnvioFormulario";
 import { usePreviaDeArquivo } from "../hooks/usePreviaDeArquivo";
 import { useVeiculoDaRota } from "../hooks/useVeiculoDaRota";
 import { ErroDaApi } from "../services/apiCliente";
+import { listarDiagnosticos } from "../services/diagnosticoService";
 import { enviarFoto, erroDoArquivo } from "../services/fotoService";
 import { listarManutencoes } from "../services/manutencaoService";
-import type { Manutencao } from "../types/manutencao";
 import { formatarDataIso, hojeIso } from "../utils/datas";
 import { formatarTamanho } from "../utils/formatos";
 
 const TIPOS_ACEITOS = "image/jpeg,image/png,image/webp,image/heic,image/heif";
-// Diagnóstico e projeto entram como opções nas etapas 5 e 8.
-const VINCULOS: { valor: "nenhum" | "manutencao"; rotulo: string }[] = [
+type Vinculo = "nenhum" | "diagnostico" | "manutencao";
+// Projeto entra como opção na etapa 8.
+const VINCULOS: { valor: Vinculo; rotulo: string }[] = [
   { valor: "nenhum", rotulo: "Nenhum" },
+  { valor: "diagnostico", rotulo: "Diagnóstico" },
   { valor: "manutencao", rotulo: "Manutenção" },
 ];
+const TEXTOS_DO_VINCULO = {
+  diagnostico: { rotulo: "Diagnóstico", carregando: "Carregando diagnósticos…",
+    vazio: "Este veículo ainda não tem diagnósticos registrados.", escolha: "Escolha o diagnóstico.",
+    erro: "Não foi possível carregar os diagnósticos.", campo: "diagnostico_id", caminho: "diagnosticos" },
+  manutencao: { rotulo: "Manutenção", carregando: "Carregando manutenções…",
+    vazio: "Este veículo ainda não tem manutenções registradas.", escolha: "Escolha a manutenção.",
+    erro: "Não foi possível carregar as manutenções.", campo: "manutencao_id", caminho: "manutencoes" },
+} as const;
 
-// "Nova foto" (PDF, página 21), com "Ligar a um registro" para manutenção.
+interface Registro {
+  id: number;
+  rotulo: string;
+}
+
+// "Nova foto" (PDF, página 21), com "Ligar a um registro" (diagnóstico ou manutenção).
 export default function FotoNovaPage() {
   const { veiculo, carregando, erro, recarregar } = useVeiculoDaRota();
   const { recarregar: recarregarLista } = useVeiculos();
@@ -39,37 +54,45 @@ export default function FotoNovaPage() {
   const [legenda, setLegenda] = useState("");
   const [data, setData] = useState(hoje);
   const [comoCapa, setComoCapa] = useState(parametros.get("capa") === "1");
-  // ?manutencao=ID: a tela foi aberta a partir de uma manutenção.
-  const manutencaoInicial = parametros.get("manutencao") ?? "";
-  const [ligar, setLigar] = useState<"nenhum" | "manutencao">(manutencaoInicial ? "manutencao" : "nenhum");
-  const [manutencaoId, setManutencaoId] = useState(manutencaoInicial);
-  const [manutencoes, setManutencoes] = useState<Manutencao[] | null>(null);
-  const [erroManutencoes, setErroManutencoes] = useState<string | null>(null);
+  // ?manutencao=ID ou ?diagnostico=ID: a tela foi aberta a partir desse registro.
+  const origem: Vinculo = parametros.get("diagnostico") ? "diagnostico"
+    : parametros.get("manutencao") ? "manutencao" : "nenhum";
+  const idDeOrigem = origem === "nenhum" ? "" : parametros.get(origem) ?? "";
+  const [ligar, setLigar] = useState<Vinculo>(origem);
+  const [registroId, setRegistroId] = useState(idDeOrigem);
+  const [registros, setRegistros] = useState<Partial<Record<Vinculo, Registro[]>>>({});
+  const [erroRegistros, setErroRegistros] = useState<string | null>(null);
   const entradaCamera = useRef<HTMLInputElement>(null);
   const entradaGaleria = useRef<HTMLInputElement>(null);
   const { enviando, erroGeral, errosCampo, setErrosCampo, enviar } = useEnvioFormulario();
 
   useEffect(() => setPreviaFalhou(false), [arquivo]);
 
-  // A lista de manutenções só é buscada quando a pessoa escolhe ligar a foto a uma.
+  // A lista de registros só é buscada quando a pessoa escolhe ligar a foto a um.
   const idVeiculo = veiculo?.id;
+  const jaCarregados = ligar === "nenhum" ? undefined : registros[ligar];
   useEffect(() => {
-    if (ligar !== "manutencao" || !idVeiculo || manutencoes !== null) return;
+    if (ligar === "nenhum" || !idVeiculo || jaCarregados !== undefined) return;
     let cancelado = false;
-    listarManutencoes(idVeiculo, { porPagina: 100 })
-      .then((pagina) => {
-        if (!cancelado) setManutencoes(pagina.itens);
+    const busca: Promise<Registro[]> = ligar === "manutencao"
+      ? listarManutencoes(idVeiculo, { porPagina: 100 }).then((pagina) => pagina.itens.map((m) => ({
+        id: m.id, rotulo: `${m.descricao} (${formatarDataIso(m.data)})` })))
+      : listarDiagnosticos(idVeiculo, "todos", 1, 100).then((pagina) => pagina.itens.map((d) => ({
+        id: d.id, rotulo: `${d.titulo} (${formatarDataIso(d.data_identificacao)})` })));
+    setErroRegistros(null);
+    busca
+      .then((lista) => {
+        if (!cancelado) setRegistros((atuais) => ({ ...atuais, [ligar]: lista }));
       })
       .catch((falha) => {
         if (!cancelado) {
-          setErroManutencoes(falha instanceof ErroDaApi ? falha.message
-            : "Não foi possível carregar as manutenções.");
+          setErroRegistros(falha instanceof ErroDaApi ? falha.message : TEXTOS_DO_VINCULO[ligar].erro);
         }
       });
     return () => {
       cancelado = true;
     };
-  }, [ligar, idVeiculo, manutencoes]);
+  }, [ligar, idVeiculo, jaCarregados]);
 
   if (carregando) {
     return <div className="pagina"><main className="conteudo conteudo--topo"><Carregando /></main></div>;
@@ -86,6 +109,14 @@ export default function FotoNovaPage() {
     );
   }
   const base = `/veiculos/${veiculo.id}`;
+  const voltar = origem !== "nenhum" ? `${base}/${TEXTOS_DO_VINCULO[origem].caminho}/${idDeOrigem}`
+    : comoCapa ? base : `${base}/fotos`;
+
+  function aoMudarVinculo(valor: Vinculo) {
+    setLigar(valor);
+    setRegistroId(valor === origem ? idDeOrigem : "");
+    setErrosCampo({});
+  }
 
   function aoEscolher(evento: ChangeEvent<HTMLInputElement>) {
     const escolhido = evento.target.files?.[0] ?? null;
@@ -103,7 +134,7 @@ export default function FotoNovaPage() {
     if (problema) erros.arquivo = problema;
     if (!data) erros.data_foto = "Informe a data da foto.";
     else if (data > hoje) erros.data_foto = "A data da foto não pode ser no futuro.";
-    if (ligar === "manutencao" && !manutencaoId) erros.manutencao_id = "Escolha a manutenção.";
+    if (ligar !== "nenhum" && !registroId) erros[TEXTOS_DO_VINCULO[ligar].campo] = TEXTOS_DO_VINCULO[ligar].escolha;
     if (Object.keys(erros).length || !arquivo) {
       setErrosCampo(erros);
       return;
@@ -111,12 +142,13 @@ export default function FotoNovaPage() {
     const deuCerto = await enviar(async () => {
       await enviarFoto(veiculo!.id, {
         arquivo, legenda, dataFoto: data, principal: comoCapa,
-        manutencaoId: ligar === "manutencao" ? Number(manutencaoId) : null,
+        manutencaoId: ligar === "manutencao" ? Number(registroId) : null,
+        diagnosticoId: ligar === "diagnostico" ? Number(registroId) : null,
       });
       if (comoCapa) await recarregarLista();
     });
     if (deuCerto) {
-      navegar(manutencaoInicial ? `${base}/manutencoes/${manutencaoInicial}` : comoCapa ? base : `${base}/fotos`, {
+      navegar(voltar, {
         replace: true,
         state: { mensagem: comoCapa ? "Foto de capa atualizada." : "Foto adicionada." },
       });
@@ -126,8 +158,7 @@ export default function FotoNovaPage() {
   return (
     <div className="pagina">
       <main className="conteudo conteudo--topo">
-        <TopoComVoltar titulo="Nova foto" voltarPara={manutencaoInicial
-          ? `${base}/manutencoes/${manutencaoInicial}` : comoCapa ? base : `${base}/fotos`} />
+        <TopoComVoltar titulo="Nova foto" voltarPara={voltar} />
         {!veiculo.ativo && (
           <Alerta tipo="erro">Este veículo está inativo e não aceita fotos novas.</Alerta>
         )}
@@ -181,20 +212,19 @@ export default function FotoNovaPage() {
             dica={data === hoje ? "Hoje. Toque para alterar." : undefined} />
 
           <GrupoOpcoes rotulo="Ligar a um registro" opcoes={VINCULOS} valor={ligar}
-            aoMudar={setLigar} />
-          {ligar === "manutencao" && (
-            erroManutencoes ? <Alerta tipo="erro">{erroManutencoes}</Alerta>
-              : manutencoes === null ? <Carregando texto="Carregando manutenções…" />
-                : manutencoes.length === 0
-                  ? <p className="campo__dica">Este veículo ainda não tem manutenções registradas.</p>
+            aoMudar={aoMudarVinculo} />
+          {ligar !== "nenhum" && (
+            erroRegistros ? <Alerta tipo="erro">{erroRegistros}</Alerta>
+              : jaCarregados === undefined ? <Carregando texto={TEXTOS_DO_VINCULO[ligar].carregando} />
+                : jaCarregados.length === 0
+                  ? <p className="campo__dica">{TEXTOS_DO_VINCULO[ligar].vazio}</p>
                   : (
-                    <CampoSelecao rotulo="Manutenção" value={manutencaoId}
-                      onChange={(e) => setManutencaoId(e.target.value)} erro={errosCampo.manutencao_id}
+                    <CampoSelecao rotulo={TEXTOS_DO_VINCULO[ligar].rotulo} value={registroId}
+                      onChange={(e) => setRegistroId(e.target.value)}
+                      erro={errosCampo[TEXTOS_DO_VINCULO[ligar].campo]}
                       opcoes={[
                         { valor: "", rotulo: "Escolha…" },
-                        ...manutencoes.map((m) => ({
-                          valor: String(m.id), rotulo: `${m.descricao} (${formatarDataIso(m.data)})`,
-                        })),
+                        ...jaCarregados.map((r) => ({ valor: String(r.id), rotulo: r.rotulo })),
                       ]} />
                   )
           )}

@@ -13,9 +13,10 @@ import type { Foto } from "../types/veiculo";
 import { formatarDataIso, formatarMesAnoLongo } from "../utils/datas";
 
 const POR_PAGINA = 30;
-// Os filtros de projeto e diagnóstico entram com esses módulos (etapas 5 e 8).
+// O filtro de projetos entra com esse módulo (etapa 8).
 const FILTROS: { valor: "" | VinculoFoto; rotulo: string }[] = [
   { valor: "", rotulo: "Todas" },
+  { valor: "diagnostico", rotulo: "Diagnósticos" },
   { valor: "manutencao", rotulo: "Manutenções" },
   { valor: "nenhum", rotulo: "Sem vínculo" },
 ];
@@ -124,6 +125,9 @@ export default function FotosPage() {
                 {foto.principal && <span className="etiqueta-foto">Capa</span>}
                 {!foto.principal && foto.manutencao_id !== null && (
                   <span className="etiqueta-foto etiqueta-foto--vinculo">Manutenção</span>
+                )}
+                {!foto.principal && foto.diagnostico_id !== null && (
+                  <span className="etiqueta-foto etiqueta-foto--vinculo">Problema</span>
                 )}
               </Link>
             ))}

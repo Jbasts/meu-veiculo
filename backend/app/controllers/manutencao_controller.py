@@ -4,6 +4,7 @@ from fastapi import Response
 
 from app.entities.sessao import SessaoAtual
 from app.schemas.manutencao_schema import (
+    DiagnosticoLigadoResposta,
     ItemResposta,
     ManutencaoDetalheResposta,
     ManutencaoEntrada,
@@ -39,6 +40,7 @@ def manutencao_resposta(detalhe: ManutencaoDetalhe) -> ManutencaoDetalheResposta
         garantia_explicacao=detalhe.garantia.explicacao, total_fotos=detalhe.total_fotos,
         itens=[ItemResposta.model_validate(item) for item in detalhe.itens],
         total_pecas=detalhe.total_pecas, total_mao_de_obra=detalhe.total_mao_de_obra,
+        diagnosticos=[DiagnosticoLigadoResposta.model_validate(d) for d in detalhe.diagnosticos],
     )
 
 

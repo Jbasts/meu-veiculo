@@ -39,6 +39,10 @@ const COM_CIVIC = {
   "GET /api/veiculos/7": () => json(200, CIVIC),
   "GET /api/veiculos/7/fotos?pagina=1&por_pagina=3": () => pagina<Foto>([]),
   "GET /api/veiculos/7/manutencoes/pendentes": () => json(200, { km_atual: 85000, itens: [] }),
+  // Sem diagnósticos: Início (5 mais graves), aba Abertos e "Resolvidos recentemente".
+  "GET /api/veiculos/7/diagnosticos?filtro=abertos&pagina=1&por_pagina=5": () => pagina([]),
+  "GET /api/veiculos/7/diagnosticos?filtro=abertos&pagina=1&por_pagina=20": () => pagina([]),
+  "GET /api/veiculos/7/diagnosticos?filtro=resolvidos&pagina=1&por_pagina=3": () => pagina([]),
 };
 
 function corpoDe(buscar: ReturnType<typeof apiFalsa>, chave: string) {
@@ -82,8 +86,11 @@ describe("Início e navegação", () => {
     await userEvent.click(within(barra).getByRole("link", { name: "Manutenção" }));
     expect(await screen.findByRole("tab", { name: "Pendentes" })).toBeInTheDocument();
     await userEvent.click(within(barra).getByRole("link", { name: "Diagnóstico" }));
+    expect(await screen.findByText("Nenhum problema em aberto")).toBeInTheDocument();
+    expect(within(barra).getByRole("link", { name: "Diagnóstico" })).toHaveAttribute("aria-current", "page");
+    await userEvent.click(within(barra).getByRole("link", { name: "Finanças" }));
     expect(await screen.findByText("Ainda não disponível")).toBeInTheDocument();
-    expect(screen.getByText(/etapa 5/)).toBeInTheDocument();
+    expect(screen.getByText(/etapa 6/)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("link", { name: "Mais" }));
     expect(await screen.findByRole("heading", { name: "Mais" })).toBeInTheDocument();

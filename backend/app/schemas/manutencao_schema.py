@@ -106,6 +106,18 @@ class ManutencaoResposta(BaseModel):
     criado_em: datetime
 
 
+class DiagnosticoLigadoResposta(BaseModel):
+    """Diagnóstico resolvido por esta manutenção, ou à espera dela (agendada)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    titulo: str
+    status: str
+    gravidade: str
+    data_identificacao: date
+
+
 class ManutencaoDetalheResposta(ManutencaoResposta):
     plano_nome: str | None
     # vigente | vencida | sem_informacao | nao_se_aplica
@@ -116,6 +128,7 @@ class ManutencaoDetalheResposta(ManutencaoResposta):
     # null quando não há itens: só o total, sem detalhamento (não é zero).
     total_pecas: Decimal | None
     total_mao_de_obra: Decimal | None
+    diagnosticos: list[DiagnosticoLigadoResposta]
 
 
 class PaginaManutencoes(BaseModel):

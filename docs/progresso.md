@@ -8,8 +8,8 @@ Status possíveis: **pendente**, **em andamento**, **entregue** (código pronto 
 | 1 | Estrutura de pastas, banco, migrations e ambiente | validada |
 | 2 | Cadastro, login, recuperação de senha e permissões | validada |
 | 3 | Veículos, quilometragem e base das fotos (upload, capa e galeria) | validada |
-| 4 | Manutenções e planos (inclui fotos ligadas a manutenção) | entregue |
-| 5 | Diagnósticos (inclui fotos ligadas a diagnóstico) | pendente |
+| 4 | Manutenções e planos (inclui fotos ligadas a manutenção) | validada |
+| 5 | Diagnósticos (inclui fotos ligadas a diagnóstico) | entregue |
 | 6 | Gastos e finanças | pendente |
 | 7 | Abastecimentos e consumo | pendente |
 | 8 | Projetos e fotos de antes/depois | pendente |
@@ -112,5 +112,24 @@ A ordem pode ser ajustada na etapa 0 para respeitar dependências; registre o mo
   - Reiniciar o backend e usar as telas com os dados reais: nova manutenção com peças e mão de obra, editar, "Ver valores" no detalhe e na aba Realizadas, agendada.
   - Conferir no terminal do PowerShell se o aviso de banco desatualizado aparece com acentos corretos (no log capturado pelo Claude os acentos saíram trocados por causa da codificação do arquivo de log; não foi possível ver o terminal dela).
   - Celular (Android/Chrome): etapa 10.
+- Validado pela Paula (30/09/2026): testou as telas no computador dela e fez o commit (`61eb695`).
 - Pendências para a próxima etapa (5 — diagnósticos): fotos ligadas a diagnóstico; manter o padrão "total calculado no backend" se diagnóstico tiver custo; envio real por SMTP continua sem teste.
 
+### Etapa 5 — Diagnósticos (30/09/2026)
+- Decisões da Paula (30/09/2026): apagar ou voltar para agendada a manutenção que resolveu → o diagnóstico é reaberto com aviso; manutenção agendada fica ligada como a prevista e resolve ao ser concluída; dá para resolver com uma manutenção nova ou com uma já registrada.
+- Ficou funcionando (código + testes do Claude):
+  - Migration 0006: chaves compostas "mesmo veículo" (diagnóstico → manutenção; foto → diagnóstico), trigger de coerência (resolvido só com realizada; aberto só com agendada; descartado sem manutenção), triggers na manutenção (concluir resolve, voltar para agendada reabre, data acompanha, apagar reabre) e conferência prévia que lista vínculos incompatíveis e para sem alterar nada.
+  - Backend: `DiagnosticoService` (lista Abertos/Resolvidos/Todos paginada, detalhe, cadastro/edição com leitura do hodômetro, em observação, descartar com motivo, reabrir, apagar com fotos e arquivos, anotações, resolver com manutenção nova numa transação só, usar manutenção já registrada, aviso de garantia do mesmo sistema), 12 endpoints em `/api/veiculos/{id}/diagnosticos`; manutenção mostra os diagnósticos ligados e grava anotações automáticas; fotos aceitam `diagnostico_id` (um vínculo só, mesmo veículo) e o filtro `vinculo=diagnostico`.
+  - Frontend: aba Diagnóstico (Abertos (n), Resolvidos, Todos, "Resolvidos recentemente"), "Novo diagnóstico" com sistema e gravidade em botões e orientação por gravidade, detalhe com selos, garantia, linha do tempo de anotações, fotos e ações; "Nova manutenção" com a faixa "Resolvendo o diagnóstico"; avisos no detalhe/edição/exclusão da manutenção; Início com problemas em aberto em "Precisa de atenção"; foto ligada a diagnóstico e filtro "Diagnósticos" na galeria.
+  - Correção encontrada no teste: o diálogo de confirmação tirava o foco do campo de texto a cada letra (o espaço acionava "Cancelar"); agora o foco só muda ao abrir.
+- Arquivos criados: `backend/migrations/versions/0006_diagnosticos.py`; `backend/app/entities/diagnostico.py`; `backend/app/{repositories/diagnostico_repository, services/diagnostico_service, schemas/diagnostico_schema, controllers/diagnostico_controller, routes/diagnostico_routes}.py`; `backend/tests/{test_migracao_0006, test_diagnosticos_api}.py`; `frontend/src/{types/diagnostico.ts, services/diagnosticoService.ts, components/PecasDiagnostico.tsx, pages/DiagnosticoPage.tsx, pages/DiagnosticoFormPage.tsx, pages/DiagnosticoDetalhePage.tsx, pages/Diagnostico.test.tsx, styles/diagnostico.css}`.
+- Arquivos alterados: `backend/app/{dependencias.py, entities/__init__.py, routes/__init__.py, routes/veiculo_routes.py}`; `backend/app/repositories/{manutencao, foto}_repository.py`; `backend/app/services/{manutencao, foto}_service.py`; `backend/app/schemas/{manutencao, veiculo}_schema.py`; `backend/app/controllers/{manutencao, foto}_controller.py`; `backend/gerenciar.py`; `backend/tests/{test_migracoes, test_banco_desatualizado}.py`; `frontend/src/{App.tsx, main.tsx}`; `components/{BarraNavegacao, Formulario}.tsx`; `pages/{Inicio, ManutencaoForm, ManutencaoDetalhe, FotoNova, Fotos, FotoDetalhe}Page.tsx`; `pages/{Manutencao, Veiculos}.test.tsx`; `services/fotoService.ts`; `types/manutencao.ts`; `README.md` (seção 13 e problemas comuns), `docs/decisoes.md`, `docs/progresso.md`.
+- Testes executados pelo Claude:
+  - `.\.venv\Scripts\python.exe -m pytest` (backend, PostgreSQL de teste): 446 passaram, 0 falharam (384 das etapas anteriores + 62 novos: 15 da migration 0006 — banco vazio, banco na 0005 preservado, parada com vínculos incompatíveis sem alterar nada, desfazer/refazer, triggers, cascata — e 47 pela API — cadastro, validação, hodômetro, filtros e ordem, anotações, situações, resolução com manutenção nova, falha forçada desfazendo tudo, envio repetido e 3 envios simultâneos criando uma manutenção só, agendada prevista e concluída, reabrir por edição e exclusão, manutenção de outro veículo/usuário recusada, garantia, isolamento entre usuários e veículos do mesmo dono, admin, veículo inativo, fotos). Um teste antigo (`test_banco_desatualizado`) supunha que a última migration era a 0005; foi ajustado para calcular a lista.
+  - `npm test` (frontend): 122 passaram, 0 falharam; `npm run build` (com `tsc`) ok.
+  - Fluxo real no Chrome (tela 412×915, automatizado) com uvicorn + Vite no banco de TESTE: 16 passos, todos ok (banco vazio, cadastro, aviso de garantia, anotação, motivo digitado no diálogo, resolver com manutenção nova de R$ 280,00, envio repetido 409, apagar manutenção reabre, agendada prevista e concluída, Início, lista, foto ligada, outra conta com 404, sem 5xx e sem erro no console). Capturas conferidas com o PDF; dois espaçamentos ajustados.
+  - Banco de desenvolvimento: `gerenciar.py migrar` aplicou a 0006 com backup `meu_veiculo_20260930_203657_antes_de_migrar.dump`; conferência somente leitura: versão 0006, chaves e triggers criados, dados preservados (1 usuário, 2 veículos, 2 manutenções com 9 itens, 2 planos, 2 fotos, 0 diagnósticos). O fluxo de teste não gravou nada nele.
+- Depende de validação da Paula:
+  - Reiniciar o backend e usar as telas com os dados reais: registrar um problema, anotar, resolver com manutenção nova (realizada e agendada), usar uma já registrada, descartar, reabrir, foto ligada ao diagnóstico.
+  - Celular (Android/Chrome): etapa 10.
+- Pendências para a próxima etapa (6 — gastos e finanças): envio real por SMTP continua sem teste; diagnóstico não entra nas despesas (o custo é o da manutenção).

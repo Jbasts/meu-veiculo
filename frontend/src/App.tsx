@@ -6,6 +6,9 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { VeiculosProvider } from "./contexts/VeiculosContext";
 import CadastroPage from "./pages/CadastroPage";
 import ContaPage from "./pages/ContaPage";
+import DiagnosticoDetalhePage from "./pages/DiagnosticoDetalhePage";
+import DiagnosticoFormPage from "./pages/DiagnosticoFormPage";
+import DiagnosticoPage, { DiagnosticoDoVeiculoPage } from "./pages/DiagnosticoPage";
 import EmBrevePage from "./pages/EmBrevePage";
 import EsqueciSenhaPage from "./pages/EsqueciSenhaPage";
 import FotoDetalhePage from "./pages/FotoDetalhePage";
@@ -50,10 +53,9 @@ export function RotasDoApp() {
           <Route path="/veiculos/:veiculoId/manutencoes/:manutencaoId" element={<ManutencaoDetalhePage />} />
           <Route path="/veiculos/:veiculoId/planos/novo" element={<PlanoFormPage />} />
           <Route path="/veiculos/:veiculoId/planos/:planoId" element={<PlanoFormPage />} />
-          <Route path="/diagnostico" element={
-            <EmBrevePage titulo="Diagnóstico" etapa={5}
-              descricao="Aqui ficarão os problemas registrados, com anotações e fotos." />
-          } />
+          <Route path="/diagnostico" element={<DiagnosticoPage />} />
+          <Route path="/veiculos/:veiculoId/diagnosticos" element={<DiagnosticoDoVeiculoPage />} />
+          <Route path="/veiculos/:veiculoId/diagnosticos/:diagnosticoId" element={<DiagnosticoDetalhePage />} />
           <Route path="/financas" element={
             <EmBrevePage titulo="Finanças" etapa={6}
               descricao="Aqui ficarão os gastos do mês e, na etapa 7, os abastecimentos e o consumo." />
@@ -72,6 +74,8 @@ export function RotasDoApp() {
         <Route path="/veiculos/:veiculoId/fotos/nova" element={<FotoNovaPage />} />
         <Route path="/veiculos/:veiculoId/manutencoes/nova" element={<ManutencaoFormPage />} />
         <Route path="/veiculos/:veiculoId/manutencoes/:manutencaoId/editar" element={<ManutencaoFormPage />} />
+        <Route path="/veiculos/:veiculoId/diagnosticos/novo" element={<DiagnosticoFormPage />} />
+        <Route path="/veiculos/:veiculoId/diagnosticos/:diagnosticoId/editar" element={<DiagnosticoFormPage />} />
       </Route>
       <Route path="/entrar" element={<RotaSoParaVisitante><LoginPage /></RotaSoParaVisitante>} />
       <Route path="/criar-conta" element={<RotaSoParaVisitante><CadastroPage /></RotaSoParaVisitante>} />

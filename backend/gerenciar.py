@@ -38,6 +38,7 @@ from app.banco.sessao import UnidadeDeTrabalho, abrir_sessao
 from app.banco.sql_original import SqlOriginalAlterado
 from app.config import FUSO_HORARIO, obter_configuracoes
 from app.repositories.arquivo_foto_repository import ArquivoFotoRepository
+from app.repositories.diagnostico_repository import DiagnosticoRepository
 from app.repositories.foto_repository import FotoRepository
 from app.repositories.manutencao_repository import ManutencaoRepository
 from app.repositories.usuario_repository import UsuarioRepository
@@ -193,7 +194,7 @@ def cmd_limpar_fotos(args: argparse.Namespace) -> None:
         with abrir_sessao(engine) as sessao:
             service = FotoService(UnidadeDeTrabalho(sessao), VeiculoRepository(sessao),
                                   FotoRepository(sessao), ArquivoFotoRepository(pasta),
-                                  ManutencaoRepository(sessao))
+                                  ManutencaoRepository(sessao), DiagnosticoRepository(sessao))
             relatorio = service.limpar_orfaos(apagar=args.apagar)
     finally:
         engine.dispose()

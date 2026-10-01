@@ -9,11 +9,17 @@ a tela "Situação do sistema" continua funcionando para mostrar o que falta.
 from fastapi import APIRouter, Depends
 
 from app.dependencias import exigir_banco_atualizado, verificar_cabecalho_do_app
-from app.routes import auth_routes, manutencao_routes, saude_routes, veiculo_routes
+from app.routes import (
+    auth_routes,
+    diagnostico_routes,
+    manutencao_routes,
+    saude_routes,
+    veiculo_routes,
+)
 
 api_router = APIRouter(prefix="/api", dependencies=[Depends(verificar_cabecalho_do_app)])
 api_router.include_router(saude_routes.router)
 
 BANCO_ATUALIZADO = [Depends(exigir_banco_atualizado)]
-for modulo in (auth_routes, veiculo_routes, manutencao_routes):
+for modulo in (auth_routes, veiculo_routes, manutencao_routes, diagnostico_routes):
     api_router.include_router(modulo.router, dependencies=BANCO_ATUALIZADO)

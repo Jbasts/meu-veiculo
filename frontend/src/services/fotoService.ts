@@ -13,16 +13,18 @@ export function urlDaFoto(veiculoId: number, fotoId: number): string {
   return `/api/veiculos/${veiculoId}/fotos/${fotoId}/arquivo`;
 }
 
-/** Filtro da galeria: todas, só as ligadas a manutenção ou só as sem vínculo. */
-export type VinculoFoto = "manutencao" | "nenhum";
+/** Filtro da galeria: só as ligadas a manutenção, a diagnóstico ou sem vínculo. */
+export type VinculoFoto = "manutencao" | "diagnostico" | "nenhum";
 
 export function listarFotos(veiculoId: number, pagina = 1, porPagina = 30, filtro: {
   vinculo?: VinculoFoto;
   manutencaoId?: number;
+  diagnosticoId?: number;
 } = {}): Promise<Pagina<Foto>> {
   let extra = "";
   if (filtro.vinculo) extra += `&vinculo=${filtro.vinculo}`;
   if (filtro.manutencaoId) extra += `&manutencao_id=${filtro.manutencaoId}`;
+  if (filtro.diagnosticoId) extra += `&diagnostico_id=${filtro.diagnosticoId}`;
   return chamarApi<Pagina<Foto>>(
     "GET", `/veiculos/${veiculoId}/fotos?pagina=${pagina}&por_pagina=${porPagina}${extra}`);
 }
@@ -36,8 +38,9 @@ export function enviarFoto(veiculoId: number, dados: {
   legenda: string;
   dataFoto: string;
   principal: boolean;
-  /** Manutenção do mesmo veículo à qual a foto fica ligada (opcional). */
+  /** Manutenção OU diagnóstico do mesmo veículo aos quais a foto fica ligada (opcional). */
   manutencaoId?: number | null;
+  diagnosticoId?: number | null;
 }): Promise<Foto> {
   const formulario = new FormData();
   formulario.append("arquivo", dados.arquivo);
@@ -45,16 +48,18 @@ export function enviarFoto(veiculoId: number, dados: {
   if (dados.dataFoto) formulario.append("data_foto", dados.dataFoto);
   formulario.append("principal", dados.principal ? "true" : "false");
   if (dados.manutencaoId) formulario.append("manutencao_id", String(dados.manutencaoId));
+  if (dados.diagnosticoId) formulario.append("diagnostico_id", String(dados.diagnosticoId));
   return chamarApi<Foto>("POST", `/veiculos/${veiculoId}/fotos`, formulario);
 }
 
-/** Atualiza legenda, data e vínculo. manutencaoId null = foto sem vínculo. */
+/** Atualiza legenda, data e vínculo. Os dois ids null = foto sem vínculo. */
 export function editarFoto(veiculoId: number, fotoId: number, legenda: string,
-  dataFoto: string, manutencaoId: number | null): Promise<Foto> {
+  dataFoto: string, manutencaoId: number | null, diagnosticoId: number | null = null): Promise<Foto> {
   return chamarApi<Foto>("PUT", `/veiculos/${veiculoId}/fotos/${fotoId}`, {
     legenda: legenda.trim() || null,
     data_foto: dataFoto,
     manutencao_id: manutencaoId,
+    diagnostico_id: diagnosticoId,
   });
 }
 
