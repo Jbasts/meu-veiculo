@@ -105,11 +105,10 @@ def _texto(valor: str | None, campo: str, maximo: int, obrigatorio: str | None =
 
 
 class ProjetoService:
-    def __init__(self, uow: Transacional, veiculos, projetos, arquivos, *,
+    def __init__(self, uow: Transacional, veiculos, projetos, *,
                  hoje: Callable[[], date] = calendario.hoje):
         self._uow = uow
         self._projetos = projetos
-        self._arquivos = arquivos
         self._acesso = AcessoVeiculo(veiculos)
         self._hoje = hoje
 
@@ -239,10 +238,7 @@ class ProjetoService:
         with self._uow.transacao():
             veiculo = self._acesso.exigir_para_alterar(usuario, veiculo_id)
             projeto = self._do_veiculo(veiculo.id, projeto_id)
-            arquivos = self._projetos.arquivos_das_fotos(projeto.id)
-            self._projetos.apagar(projeto)
-        for caminho in arquivos:
-            self._arquivos.apagar(caminho)
+            self._projetos.apagar(projeto)  # gastos e fotos (com as imagens) saem em cascata
 
     # --------------------------------------------------------------------- itens
     def _validar_item(self, dados: dict) -> dict:

@@ -16,8 +16,8 @@ from app.entities.sessao import Sessao
 from app.entities.tentativa_acesso import TentativaAcesso
 from app.entities.usuario import Usuario
 from app.entities.veiculo import Veiculo
-from app.entities.veiculo_foto import VeiculoFoto
+from app.entities.veiculo_foto import FotoConteudo, VeiculoFoto
 
-__all__ = ["Abastecimento", "Diagnostico", "DiagnosticoNota", "Gasto", "LeituraKm", "Manutencao", "ManutencaoItem",
+__all__ = ["Abastecimento", "FotoConteudo", "Diagnostico", "DiagnosticoNota", "Gasto", "LeituraKm", "Manutencao", "ManutencaoItem",
            "MedicaoTanque", "PlanoManutencao", "Projeto", "ProjetoItem", "RecuperacaoSenha", "Sessao", "TentativaAcesso", "Usuario", "Veiculo",
            "VeiculoFoto"]

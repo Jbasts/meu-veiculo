@@ -144,7 +144,7 @@ def garantia_na_data(manutencao: Manutencao, data: date, km: int | None) -> str 
 
 class DiagnosticoService:
     def __init__(self, uow: Transacional, veiculos, diagnosticos, manutencoes, leituras, fotos,
-                 arquivos, manutencao_service: ManutencaoService, *,
+                 manutencao_service: ManutencaoService, *,
                  hoje: Callable[[], date] = calendario.hoje):
         self._uow = uow
         self._veiculos = veiculos
@@ -152,7 +152,6 @@ class DiagnosticoService:
         self._manutencoes = manutencoes
         self._leituras = leituras
         self._fotos = fotos
-        self._arquivos = arquivos
         self._servico_de_manutencao = manutencao_service
         self._acesso = AcessoVeiculo(veiculos)
         self._hoje = hoje
@@ -325,15 +324,12 @@ class DiagnosticoService:
         return self._detalhar(veiculo, diagnostico)
 
     def apagar(self, usuario: Usuario, veiculo_id: int, diagnostico_id: int) -> None:
-        """Apaga o diagnóstico, as anotações e as fotos dele (linhas e arquivos).
+        """Apaga o diagnóstico, as anotações e as fotos dele (o banco apaga em cascata).
         A manutenção ligada, se houver, continua no histórico."""
         with self._uow.transacao():
             veiculo = self._acesso.exigir_para_alterar(usuario, veiculo_id, bloquear=True)
             diagnostico = self._do_veiculo(veiculo, diagnostico_id)
-            arquivos = self._fotos.arquivos_do_diagnostico(diagnostico.id)
             self._diagnosticos.apagar(diagnostico)
-        for caminho in arquivos:
-            self._arquivos.apagar(caminho)
 
     # --------------------------------------------------------------- resolução
     def _em_aberto_e_livre(self, diagnostico: Diagnostico) -> None:

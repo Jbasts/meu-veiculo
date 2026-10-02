@@ -47,7 +47,7 @@ meu-veiculo/
 ├── CLAUDE.md
 ├── README.md                 # guia completo, atualizado a cada etapa
 ├── backend/
-│   ├── gerenciar.py          # comandos (criar-bancos, estado, migrar, adotar, backup, promover-admin, limpar-fotos)
+│   ├── gerenciar.py          # comandos (criar-bancos, estado, migrar, adotar, backup, promover-admin, importar-fotos)
 │   ├── migrations/versions/  # Alembic; 0001 = SQL original (conferido por SHA-256)
 │   ├── tests/                # pytest no PostgreSQL de teste
 │   └── app/
@@ -80,7 +80,7 @@ PowerShell. No PowerShell, o `npm` exige `Set-ExecutionPolicy -Scope CurrentUser
 - Banco já existente criado com o SQL original (pasta `backend`): `... gerenciar.py backup` e `... gerenciar.py adotar-banco-existente`
 - Primeiro administrador (pasta `backend`, conta já criada pela tela): `.\.venv\Scripts\python.exe gerenciar.py promover-admin EMAIL`
 - E-mails de desenvolvimento (modo arquivo): arquivos `.eml` em `backend\emails_dev\` (fora do Git)
-- Fotos: arquivos em `backend\storage\` (fora do Git; `PASTA_FOTOS`). Conferir órfãos (pasta `backend`): `.\.venv\Scripts\python.exe gerenciar.py limpar-fotos` (`--apagar` para apagar)
+- Fotos: imagens no PostgreSQL (tabela `foto_conteudo`, migration 0013); nada é gravado em pasta. Copiar para o banco fotos que ainda estejam na antiga pasta `backend\storage\` (pasta `backend`): `.\.venv\Scripts\python.exe gerenciar.py importar-fotos`
 - Iniciar backend (pasta `backend`): `.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload` → http://127.0.0.1:8000/docs
 - Preparar frontend (pasta `frontend`): `npm ci`
 - Iniciar frontend (pasta `frontend`): `npm run dev` → http://localhost:5173

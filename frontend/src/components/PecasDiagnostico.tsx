@@ -4,7 +4,6 @@
 import { Link } from "react-router";
 
 import {
-  emAberto,
   ROTULO_STATUS,
   rotuloGravidade,
   type DiagnosticoResumo,
@@ -99,13 +98,4 @@ export function LinhaEncerrado({ veiculoId, diagnostico: d }: {
       </Link>
     </li>
   );
-}
-
-/** Um item de qualquer situação (aba "Todos"). */
-export function ItemDiagnostico({ veiculoId, diagnostico }: {
-  veiculoId: number; diagnostico: DiagnosticoResumo;
-}) {
-  return emAberto(diagnostico.status)
-    ? <CartaoDiagnostico veiculoId={veiculoId} diagnostico={diagnostico} />
-    : <LinhaEncerrado veiculoId={veiculoId} diagnostico={diagnostico} />;
 }

@@ -46,7 +46,6 @@ from app.entities.sessao import SessaoAtual
 from app.repositories.abastecimento_repository import AbastecimentoRepository
 from app.repositories.medicao_tanque_repository import MedicaoTanqueRepository
 from app.repositories.admin_repository import AdminRepository
-from app.repositories.arquivo_foto_repository import ArquivoFotoRepository
 from app.repositories.diagnostico_repository import DiagnosticoRepository
 from app.repositories.foto_repository import FotoRepository
 from app.repositories.gasto_repository import FinancasRepository, GastoRepository
@@ -147,59 +146,42 @@ def obter_veiculo_controller(sessao: SessaoDep) -> VeiculoController:
     )
 
 
-def obter_arquivos_de_foto(cfg: ConfigDep) -> ArquivoFotoRepository:
-    return ArquivoFotoRepository(cfg.pasta_fotos)
-
-
-def obter_foto_controller(
-    sessao: SessaoDep,
-    arquivos: Annotated[ArquivoFotoRepository, Depends(obter_arquivos_de_foto)],
-) -> FotoController:
+def obter_foto_controller(sessao: SessaoDep) -> FotoController:
     return FotoController(FotoService(
-        UnidadeDeTrabalho(sessao), VeiculoRepository(sessao), FotoRepository(sessao), arquivos,
+        UnidadeDeTrabalho(sessao), VeiculoRepository(sessao), FotoRepository(sessao),
         ManutencaoRepository(sessao), DiagnosticoRepository(sessao), ProjetoRepository(sessao),
     ))
 
 
-def obter_projeto_controller(
-    sessao: SessaoDep,
-    arquivos: Annotated[ArquivoFotoRepository, Depends(obter_arquivos_de_foto)],
-) -> ProjetoController:
+def obter_projeto_controller(sessao: SessaoDep) -> ProjetoController:
     return ProjetoController(ProjetoService(
-        UnidadeDeTrabalho(sessao), VeiculoRepository(sessao), ProjetoRepository(sessao), arquivos))
+        UnidadeDeTrabalho(sessao), VeiculoRepository(sessao), ProjetoRepository(sessao)))
 
 
 def _manutencao_service(sessao: Session, uow: UnidadeDeTrabalho, veiculos: VeiculoRepository,
-                        planos: PlanoRepository,
-                        arquivos: ArquivoFotoRepository) -> ManutencaoService:
+                        planos: PlanoRepository) -> ManutencaoService:
     return ManutencaoService(uow, veiculos, planos, ManutencaoRepository(sessao),
-                             LeituraKmRepository(sessao), FotoRepository(sessao), arquivos,
+                             LeituraKmRepository(sessao), FotoRepository(sessao),
                              DiagnosticoRepository(sessao))
 
 
-def obter_manutencao_controller(
-    sessao: SessaoDep,
-    arquivos: Annotated[ArquivoFotoRepository, Depends(obter_arquivos_de_foto)],
-) -> ManutencaoController:
+def obter_manutencao_controller(sessao: SessaoDep) -> ManutencaoController:
     uow = UnidadeDeTrabalho(sessao)
     veiculos = VeiculoRepository(sessao)
     planos = PlanoRepository(sessao)
     return ManutencaoController(
         PlanoService(uow, veiculos, planos),
-        _manutencao_service(sessao, uow, veiculos, planos, arquivos),
+        _manutencao_service(sessao, uow, veiculos, planos),
     )
 
 
-def obter_diagnostico_controller(
-    sessao: SessaoDep,
-    arquivos: Annotated[ArquivoFotoRepository, Depends(obter_arquivos_de_foto)],
-) -> DiagnosticoController:
+def obter_diagnostico_controller(sessao: SessaoDep) -> DiagnosticoController:
     uow = UnidadeDeTrabalho(sessao)
     veiculos = VeiculoRepository(sessao)
     return DiagnosticoController(DiagnosticoService(
         uow, veiculos, DiagnosticoRepository(sessao), ManutencaoRepository(sessao),
-        LeituraKmRepository(sessao), FotoRepository(sessao), arquivos,
-        _manutencao_service(sessao, uow, veiculos, PlanoRepository(sessao), arquivos),
+        LeituraKmRepository(sessao), FotoRepository(sessao),
+        _manutencao_service(sessao, uow, veiculos, PlanoRepository(sessao)),
     ))
 
 

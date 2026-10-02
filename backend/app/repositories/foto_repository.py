@@ -1,11 +1,11 @@
-"""Acesso à tabela veiculo_foto (metadados; os arquivos ficam em arquivo_foto_repository)."""
+"""Acesso às tabelas veiculo_foto (metadados) e foto_conteudo (a imagem)."""
 
 from datetime import date
 
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from app.entities.veiculo_foto import VeiculoFoto
+from app.entities.veiculo_foto import FotoConteudo, VeiculoFoto
 
 VINCULO_MANUTENCAO = "manutencao"
 VINCULO_DIAGNOSTICO = "diagnostico"
@@ -67,18 +67,6 @@ class FotoRepository:
             .limit(limite).offset(deslocamento)
         ))
 
-    def arquivos_da_manutencao(self, manutencao_id: int) -> list[str]:
-        """Caminhos dos arquivos das fotos ligadas a uma manutenção."""
-        return list(self._sessao.scalars(
-            select(VeiculoFoto.arquivo).where(VeiculoFoto.manutencao_id == manutencao_id)
-        ))
-
-    def arquivos_do_diagnostico(self, diagnostico_id: int) -> list[str]:
-        """Caminhos dos arquivos das fotos ligadas a um diagnóstico."""
-        return list(self._sessao.scalars(
-            select(VeiculoFoto.arquivo).where(VeiculoFoto.diagnostico_id == diagnostico_id)
-        ))
-
     def capas(self, veiculo_ids: list[int]) -> dict[int, int]:
         """veiculo_id -> id da foto de capa, só para os veículos que têm capa."""
         if not veiculo_ids:
@@ -134,6 +122,23 @@ class FotoRepository:
     def apagar(self, foto: VeiculoFoto) -> None:
         self._sessao.delete(foto)
         self._sessao.flush()
+
+    # ----------------------------------------------------------- conteúdo
+    def salvar_conteudo(self, foto_id: int, dados: bytes) -> None:
+        self._sessao.add(FotoConteudo(foto_id=foto_id, dados=dados))
+        self._sessao.flush()
+
+    def conteudo(self, foto_id: int) -> bytes | None:
+        """Os bytes da imagem, ou None se a foto não tem conteúdo (arquivo perdido antes da 0013)."""
+        return self._sessao.scalar(select(FotoConteudo.dados).where(FotoConteudo.foto_id == foto_id))
+
+    def sem_conteudo(self) -> list[VeiculoFoto]:
+        """Fotos de todos os veículos que ainda não têm a imagem no banco."""
+        return list(self._sessao.scalars(
+            select(VeiculoFoto)
+            .where(~select(FotoConteudo.foto_id).where(FotoConteudo.foto_id == VeiculoFoto.id).exists())
+            .order_by(VeiculoFoto.id)
+        ))
 
     def arquivos_registrados(self) -> set[str]:
         return set(self._sessao.scalars(select(VeiculoFoto.arquivo)))

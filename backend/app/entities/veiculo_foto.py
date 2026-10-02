@@ -1,15 +1,14 @@
-"""Tabela veiculo_foto (SQL original): metadados das fotos.
+"""Tabelas veiculo_foto (SQL original, metadados) e foto_conteudo (0013, a imagem).
 
-O arquivo em si fica na pasta de fotos do backend (PASTA_FOTOS), fora do
-PostgreSQL; aqui vai só o caminho relativo, com nome gerado pelo backend.
-Os vínculos (projeto, diagnóstico, manutenção) começam a ser usados nas
-etapas desses módulos.
+A imagem fica no PostgreSQL, numa tabela separada, para que a galeria liste
+as fotos sem carregar os bytes de cada uma. veiculo_foto.arquivo é só um nome
+de referência gerado pelo backend (até a 0013, era o caminho na pasta de fotos).
 """
 
 from dataclasses import dataclass
 from datetime import date, datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, func, text
+from sqlalchemy import DateTime, ForeignKey, LargeBinary, String, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.entities.base import Base
@@ -35,6 +34,16 @@ class VeiculoFoto(Base):
     diagnostico_id: Mapped[int | None]
     manutencao_id: Mapped[int | None]
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class FotoConteudo(Base):
+    """Os bytes da imagem (JPEG, PNG ou WebP já regravados pelo backend)."""
+
+    __tablename__ = "foto_conteudo"
+
+    foto_id: Mapped[int] = mapped_column(
+        ForeignKey("veiculo_foto.id", ondelete="CASCADE"), primary_key=True)
+    dados: Mapped[bytes] = mapped_column(LargeBinary)
 
 
 @dataclass(frozen=True)

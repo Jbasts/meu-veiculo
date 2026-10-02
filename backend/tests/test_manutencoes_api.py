@@ -7,10 +7,10 @@ import pytest
 from tests.auth_utils import executar_sql, valor_sql
 from tests.veiculo_utils import (  # noqa: F401  (fixtures)
     admin,
-    arquivos_na_pasta,
     banco,
     criar_veiculo,
     enviar_foto,
+    imagens_no_banco,
     pasta_fotos,
     paula,
     rafael,
@@ -567,17 +567,17 @@ def test_foto_nao_pode_ser_ligada_a_manutencao_de_outro_veiculo(banco, paula, ra
                 "legenda": None, "data_foto": str(hoje), "manutencao_id": manutencao["id"]})
             assert edicao.status_code == 422
     # Nenhum arquivo ficou sobrando das tentativas recusadas.
-    assert len(arquivos_na_pasta(pasta_fotos)) == 1
+    assert imagens_no_banco(banco) == 1
     assert valor_sql(banco, "SELECT count(*) FROM veiculo_foto WHERE manutencao_id IS NOT NULL") == 0
 
 
-def test_apagar_manutencao_apaga_as_fotos_dela_e_os_arquivos(banco, paula, civic, hoje, pasta_fotos):
+def test_apagar_manutencao_apaga_as_fotos_dela_e_as_imagens(banco, paula, civic, hoje, pasta_fotos):
     feita = criar_manutencao(paula, civic["id"], hoje)
     outra = enviar_foto(paula, civic["id"]).json()
     enviar_foto(paula, civic["id"], manutencao_id=feita["id"])
     enviar_foto(paula, civic["id"], manutencao_id=feita["id"])
-    assert len(arquivos_na_pasta(pasta_fotos)) == 3
+    assert imagens_no_banco(banco) == 3
 
     assert paula.delete(f"/api/veiculos/{civic['id']}/manutencoes/{feita['id']}").status_code == 204
     assert [f["id"] for f in paula.get(f"/api/veiculos/{civic['id']}/fotos").json()["itens"]] == [outra["id"]]
-    assert len(arquivos_na_pasta(pasta_fotos)) == 1  # os dois arquivos saíram junto com as linhas
+    assert imagens_no_banco(banco) == 1  # as duas imagens saíram junto com as linhas

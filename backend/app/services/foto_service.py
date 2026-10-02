@@ -1,16 +1,13 @@
 """Regras das fotos do veículo: envio, galeria, capa e exclusão.
 
-Arquivo e banco
-- Os arquivos ficam numa pasta do backend (PASTA_FOTOS); o PostgreSQL guarda
-  só os metadados (caminho, tipo, tamanho, legenda, data, capa).
-- O nome do arquivo é gerado aqui (veiculos/<id do veículo>/<código>.jpg);
-  o nome enviado pelo usuário nunca é usado.
-- Ordem no envio: 1) grava o arquivo; 2) grava a linha no banco. Se o banco
-  falhar, o arquivo é apagado. Se o servidor cair entre os dois passos, sobra
-  um arquivo sem linha ("órfão"), que ninguém consegue acessar; o comando
-  "gerenciar.py limpar-fotos" encontra e apaga esses arquivos.
-- Ordem na exclusão: 1) apaga a linha no banco; 2) apaga o arquivo. Se o
-  passo 2 falhar, o arquivo vira órfão e sai na próxima limpeza.
+Tudo no banco (migration 0013)
+- A imagem fica no PostgreSQL (tabela foto_conteudo) e os metadados em
+  veiculo_foto (tipo, tamanho, legenda, data, capa, vínculo).
+- O envio grava a foto e a imagem na MESMA transação: ou as duas ficam, ou
+  nenhuma. Apagar a foto (ou o registro a que ela está ligada) apaga a imagem
+  junto, por cascata. Não sobra arquivo em pasta nenhuma.
+- veiculo_foto.arquivo recebe um nome gerado aqui (veiculos/<id>/<código>.jpg),
+  só como referência; o nome enviado pelo usuário nunca é usado.
 
 Acesso
 - Toda operação confere o veículo (dono ou admin) E se a foto é daquele
@@ -33,7 +30,6 @@ Capa
 import uuid
 from dataclasses import dataclass
 from datetime import date
-from pathlib import Path
 from typing import Callable, Protocol
 
 from app.entities.usuario import Usuario
@@ -45,9 +41,6 @@ from app.services.imagem_service import preparar_imagem
 from app.services.paginacao import Pagina, limite_e_deslocamento
 
 TAMANHO_MAXIMO_LEGENDA = 150
-# Arquivo recém-gravado pode ser de um envio ainda em andamento: a limpeza
-# só considera órfão o arquivo com mais de uma hora.
-IDADE_MINIMA_ORFAO_SEGUNDOS = 3600
 
 
 class Transacional(Protocol):
@@ -55,16 +48,9 @@ class Transacional(Protocol):
 
 
 @dataclass(frozen=True)
-class ArquivoDaFoto:
+class ImagemDaFoto:
     foto: VeiculoFoto
-    caminho: Path
-
-
-@dataclass(frozen=True)
-class RelatorioDeLimpeza:
-    arquivos_orfaos: list[str]      # arquivo na pasta, sem linha no banco
-    fotos_sem_arquivo: list[str]    # linha no banco, sem arquivo na pasta
-    apagados: int
+    conteudo: bytes
 
 
 def _legenda(texto: str | None) -> str | None:
@@ -76,14 +62,13 @@ def _legenda(texto: str | None) -> str | None:
 
 
 class FotoService:
-    def __init__(self, uow: Transacional, veiculos, fotos, arquivos, manutencoes, diagnosticos,
+    def __init__(self, uow: Transacional, veiculos, fotos, manutencoes, diagnosticos,
                  projetos, *,
                  preparar: Callable[[bytes], ImagemPronta] = preparar_imagem,
                  hoje: Callable[[], date] = calendario.hoje):
         self._uow = uow
         self._veiculos = veiculos
         self._fotos = fotos
-        self._arquivos = arquivos
         self._manutencoes = manutencoes
         self._diagnosticos = diagnosticos
         self._projetos = projetos
@@ -167,12 +152,13 @@ class FotoService:
         veiculo = self._acesso.exigir(usuario, veiculo_id)
         return self._foto_do_veiculo(veiculo.id, foto_id)
 
-    def arquivo(self, usuario: Usuario, veiculo_id: int, foto_id: int) -> ArquivoDaFoto:
-        """Onde está o arquivo da foto, depois de conferida a permissão."""
+    def imagem(self, usuario: Usuario, veiculo_id: int, foto_id: int) -> ImagemDaFoto:
+        """Os bytes da imagem, depois de conferida a permissão."""
         foto = self.obter(usuario, veiculo_id, foto_id)
-        if not self._arquivos.existe(foto.arquivo):
+        conteudo = self._fotos.conteudo(foto.id)
+        if conteudo is None:
             raise NaoEncontrado("O arquivo desta foto não está mais disponível.")
-        return ArquivoDaFoto(foto, self._arquivos.caminho(foto.arquivo))
+        return ImagemDaFoto(foto, conteudo)
 
     # ------------------------------------------------------------------ gravação
     def adicionar(self, usuario: Usuario, veiculo_id: int, conteudo: bytes,
@@ -185,20 +171,15 @@ class FotoService:
         vinculo = self._vinculo(veiculo.id, manutencao_id, diagnostico_id, projeto_id, momento)
         imagem = self._preparar(conteudo)
 
-        caminho = f"veiculos/{veiculo.id}/{uuid.uuid4().hex}.{imagem.extensao}"
-        self._arquivos.salvar(caminho, imagem.conteudo)
-        try:
-            with self._uow.transacao():
-                if principal:
-                    self._veiculos.bloquear(veiculo.id)
-                foto = self._fotos.criar(veiculo.id, caminho, imagem.tipo_mime,
-                                         len(imagem.conteudo), legenda, data_foto, **vinculo)
-                if principal:
-                    self._fotos.definir_capa(veiculo.id, foto.id)
-        except BaseException:
-            # O banco não gravou: o arquivo não pode ficar sobrando.
-            self._arquivos.apagar(caminho)
-            raise
+        nome = f"veiculos/{veiculo.id}/{uuid.uuid4().hex}.{imagem.extensao}"
+        with self._uow.transacao():
+            if principal:
+                self._veiculos.bloquear(veiculo.id)
+            foto = self._fotos.criar(veiculo.id, nome, imagem.tipo_mime,
+                                     len(imagem.conteudo), legenda, data_foto, **vinculo)
+            self._fotos.salvar_conteudo(foto.id, imagem.conteudo)
+            if principal:
+                self._fotos.definir_capa(veiculo.id, foto.id)
         return foto
 
     def editar(self, usuario: Usuario, veiculo_id: int, foto_id: int, legenda: str | None,
@@ -232,18 +213,5 @@ class FotoService:
     def apagar(self, usuario: Usuario, veiculo_id: int, foto_id: int) -> None:
         veiculo = self._acesso.exigir_para_alterar(usuario, veiculo_id)
         foto = self._foto_do_veiculo(veiculo.id, foto_id)
-        caminho = foto.arquivo
         with self._uow.transacao():
-            self._fotos.apagar(foto)
-        # Só depois de confirmado no banco. Se falhar, a limpeza de órfãos resolve.
-        self._arquivos.apagar(caminho)
-
-    # ------------------------------------------------------------- manutenção
-    def limpar_orfaos(self, apagar: bool) -> RelatorioDeLimpeza:
-        """Compara a pasta de fotos com o banco (comando gerenciar.py limpar-fotos)."""
-        registrados = self._fotos.arquivos_registrados()
-        antigos = self._arquivos.listar(idade_minima_segundos=IDADE_MINIMA_ORFAO_SEGUNDOS)
-        orfaos = [caminho for caminho in antigos if caminho not in registrados]
-        sem_arquivo = sorted(c for c in registrados if not self._arquivos.existe(c))
-        apagados = sum(1 for caminho in orfaos if self._arquivos.apagar(caminho)) if apagar else 0
-        return RelatorioDeLimpeza(orfaos, sem_arquivo, apagados)
+            self._fotos.apagar(foto)  # a imagem sai junto (cascata)

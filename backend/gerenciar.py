@@ -15,8 +15,8 @@ Comandos:
     backup                   grava uma cópia do banco na pasta backend/backups
     promover-admin EMAIL     torna administradora uma conta já cadastrada
                              (é o único jeito de criar o primeiro admin)
-    limpar-fotos [--apagar]  compara a pasta de fotos com o banco: lista os
-                             arquivos sem registro e, com --apagar, apaga-os
+    importar-fotos [--pasta] copia para o banco as fotos que ainda estão só
+                             na antiga pasta (nada é apagado)
 
 Use --teste para agir no banco de teste em vez do de desenvolvimento.
 """
@@ -38,14 +38,10 @@ from app.banco.sessao import UnidadeDeTrabalho, abrir_sessao
 from app.banco.sql_original import SqlOriginalAlterado
 from app.config import FUSO_HORARIO, obter_configuracoes
 from app.repositories.arquivo_foto_repository import ArquivoFotoRepository
-from app.repositories.diagnostico_repository import DiagnosticoRepository
-from app.repositories.projeto_repository import ProjetoRepository
 from app.repositories.foto_repository import FotoRepository
-from app.repositories.manutencao_repository import ManutencaoRepository
 from app.repositories.usuario_repository import UsuarioRepository
-from app.repositories.veiculo_repository import VeiculoRepository
 from app.services.erros import ErroDeNegocio
-from app.services.foto_service import FotoService
+from app.services.importacao_fotos_service import ImportacaoFotosService
 from app.services.usuario_service import UsuarioService
 
 DESCRICAO_SITUACAO = {
@@ -187,34 +183,36 @@ def cmd_promover_admin(args: argparse.Namespace) -> None:
         print(f"A conta {args.email.strip().lower()} já era administradora. Nada mudou.")
 
 
-def cmd_limpar_fotos(args: argparse.Namespace) -> None:
+def cmd_importar_fotos(args: argparse.Namespace) -> None:
     exigir_senha_da_aplicacao()
     pasta = args.pasta or obter_configuracoes().pasta_fotos
     engine = criar_engine(nome_do_banco(args))
     try:
         with abrir_sessao(engine) as sessao:
-            service = FotoService(UnidadeDeTrabalho(sessao), VeiculoRepository(sessao),
-                                  FotoRepository(sessao), ArquivoFotoRepository(pasta),
-                                  ManutencaoRepository(sessao), DiagnosticoRepository(sessao),
-                                  ProjetoRepository(sessao))
-            relatorio = service.limpar_orfaos(apagar=args.apagar)
+            relatorio = ImportacaoFotosService(UnidadeDeTrabalho(sessao), FotoRepository(sessao),
+                                               ArquivoFotoRepository(pasta)).importar()
     finally:
         engine.dispose()
-    print(f"Pasta de fotos: {pasta}")
-    print(f"Arquivos sem registro no banco (com mais de 1 hora): {len(relatorio.arquivos_orfaos)}")
-    for caminho in relatorio.arquivos_orfaos:
+    print(f"Pasta lida: {relatorio.pasta}")
+    print(f"Fotos copiadas para o banco agora: {len(relatorio.importadas)}")
+    for descricao in relatorio.importadas:
+        print(f"  - {descricao}")
+    print(f"Fotos sem imagem no banco e sem arquivo na pasta: {len(relatorio.sem_arquivo)}")
+    for descricao in relatorio.sem_arquivo:
+        print(f"  - {descricao}")
+    if relatorio.sem_arquivo:
+        print("Elas aparecem na galeria como 'Imagem indisponível'. Se tiver os arquivos (por "
+              "exemplo, num backup da antiga pasta storage), coloque-os na pasta e rode de novo; "
+              "ou apague essas fotos pela tela.")
+    if relatorio.invalidos:
+        print(f"Arquivos vazios ou acima de 10 MB (não copiados): {len(relatorio.invalidos)}")
+        for descricao in relatorio.invalidos:
+            print(f"  - {descricao}")
+    print(f"Arquivos na pasta que não são de nenhuma foto: {len(relatorio.arquivos_sem_foto)}")
+    for caminho in relatorio.arquivos_sem_foto:
         print(f"  - {caminho}")
-    if relatorio.arquivos_orfaos:
-        if args.apagar:
-            print(f"Apagados: {relatorio.apagados}")
-        else:
-            print("Nada foi apagado. Para apagar, rode de novo com --apagar.")
-    print(f"Fotos no banco sem arquivo na pasta: {len(relatorio.fotos_sem_arquivo)}")
-    for caminho in relatorio.fotos_sem_arquivo:
-        print(f"  - {caminho}")
-    if relatorio.fotos_sem_arquivo:
-        print("Essas fotos aparecem na galeria sem imagem. Restaure os arquivos de um backup "
-              "da pasta de fotos ou apague as fotos pela tela.")
+    print("Nenhum arquivo foi apagado. As fotos são lidas só do banco; a pasta pode ser apagada "
+          "depois de você conferir as fotos no app.")
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -227,7 +225,7 @@ def main(argv: list[str] | None = None) -> None:
         ("adotar-banco-existente", cmd_adotar, "registra banco criado com o SQL original"),
         ("backup", cmd_backup, "grava cópia do banco em backend/backups"),
         ("promover-admin", cmd_promover_admin, "torna administradora uma conta já cadastrada"),
-        ("limpar-fotos", cmd_limpar_fotos, "lista (ou apaga) arquivos de foto sem registro"),
+        ("importar-fotos", cmd_importar_fotos, "copia para o banco fotos que ainda estão na pasta"),
     ):
         p = sub.add_parser(nome, help=ajuda)
         p.set_defaults(funcao=funcao)
@@ -235,9 +233,7 @@ def main(argv: list[str] | None = None) -> None:
             p.add_argument("--teste", action="store_true", help="usar o banco de teste")
         if nome == "promover-admin":
             p.add_argument("email", help="e-mail da conta (criada antes pela tela 'Criar conta')")
-        if nome == "limpar-fotos":
-            p.add_argument("--apagar", action="store_true",
-                           help="apaga os arquivos sem registro (sem isso, só lista)")
+        if nome == "importar-fotos":
             p.add_argument("--pasta", type=Path, default=None,
                            help="pasta das fotos (padrão: PASTA_FOTOS do .env)")
 

@@ -14,7 +14,7 @@ Status possíveis: **pendente**, **em andamento**, **entregue** (código pronto 
 | 7 | Abastecimentos e consumo | validada |
 | 8 | Projetos e fotos de antes/depois | validada |
 | 9 | Histórico, tela inicial e administração | validada |
-| 10 | Revisão integrada, acesso pelo celular e README final | entregue |
+| 10 | Revisão integrada, acesso pelo celular e README final | validada |
 
 A ordem pode ser ajustada na etapa 0 para respeitar dependências; registre o motivo em `decisoes.md`.
 
@@ -240,3 +240,14 @@ A ordem pode ser ajustada na etapa 0 para respeitar dependências; registre o mo
   - Chrome automatizado com a versão final (preview) e backend de teste na porta 8001, sem tocar no backend de desenvolvimento da 8000: service worker e manifesto ok; Sair pela tela sem sobrar nada da conta no navegador; página sem conexão (achado e corrigido: o ícone aparecia quebrado, agora é desenhado dentro da página); acesso pelo IP 192.168.1.40 sem service worker, com cadastro, sessão e isolamento entre contas; log sem 5xx e sem senha/token.
   - Banco de desenvolvimento: nada foi gravado. Observação: o backend de desenvolvimento que estava ligado com `--reload` recarregou sozinho com o código novo.
 - Depende de validação da Paula (seção 19.4 do README): abrir no celular Android pela rede (firewall e rede Privada), instalar o app (cabo USB ou opção do Chrome), câmera do celular, link de e-mail com `URL_FRONTEND` pelo IP, SMTP real.
+- Validado pela Paula (02/10/2026): "testei no celular e está perfeito". Commit e envio ao GitHub feitos por ela.
+- Limpeza pedida pela Paula (02/10/2026): apagados `backend/0002` (arquivo vazio no Git), `frontend/src/pages/EmBrevePage.tsx` (tela provisória sem uso), o componente `ItemDiagnostico` (nunca usado) e `frontend/dist` (gerado pelo build). `npm test`: 207 passaram, 0 falharam; `npm run typecheck` sem erros.
+
+### Ajuste depois da etapa 10 — fotos dentro do banco (02/10/2026), migration 0013
+- Pedido da Paula: todos os dados no banco, nada em pasta da aplicação.
+- Ficou funcionando (código + testes do Claude): tabela `foto_conteudo` com a imagem (bytea, 1 byte a 10 MB, cascata de `veiculo_foto`); envio grava foto e imagem na mesma transação; apagar foto, veículo, manutenção, diagnóstico ou projeto apaga as imagens em cascata; a 0013 copia as imagens da pasta antiga sem apagar nada e lista as que não tinham arquivo; `gerenciar.py importar-fotos` substitui o `limpar-fotos`; desfazer a 0013 é recusado se houver imagens.
+- Arquivos criados: `backend/migrations/versions/0013_fotos_no_banco.py`, `backend/app/services/importacao_fotos_service.py`, `backend/tests/test_migracao_0013.py`.
+- Arquivos alterados: `backend/app/{entities/veiculo_foto, entities/__init__, repositories/foto_repository, repositories/projeto_repository, repositories/arquivo_foto_repository (agora só lê a pasta antiga), services/foto_service, services/manutencao_service, services/diagnostico_service, services/projeto_service, controllers/foto_controller, dependencias, config}.py`, `backend/gerenciar.py`, `backend/.env.example`; testes `veiculo_utils, test_fotos_api, test_manutencoes_api, test_diagnosticos_api, test_projetos_api, test_migracoes`; `README.md` (seções 2, 3.1, 8, 11.3 a 11.5), `CLAUDE.md` (comandos), `docs/decisoes.md`, `docs/progresso.md`. Frontend sem mudança (o endereço da imagem é o mesmo).
+- Testes executados pelo Claude: `.\.venv\Scripts\python.exe -m pytest` (backend, PostgreSQL de teste): 737 passaram, 0 falharam (730 anteriores, com os de fotos reescritos para o banco, + 7 da migration 0013; na primeira execução 1 falhou, um teste de projetos que ainda contava arquivos na pasta, corrigido e conferido). `npm test`: 207 passaram, 0 falharam; `npm run typecheck` sem erros.
+- Não executado: a 0013 NÃO foi aplicada no banco de desenvolvimento (a Paula roda `gerenciar.py migrar`, que faz o backup antes e copia as fotos de `backend\storage`).
+- Validado pela Paula (02/10/2026): aplicou a 0013, testou ("funcionou certinho") e apagou a pasta `backend\storage`. Conferido pelo Claude, só leitura: banco de desenvolvimento na 0013, 9 fotos e 9 imagens no banco, `/api/saude` "Tudo certo".

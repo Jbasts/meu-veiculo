@@ -7,7 +7,6 @@ API, depois de o service conferir a sessão e a quem pertence o veículo.
 from datetime import date
 
 from fastapi import Request, Response, UploadFile
-from fastapi.responses import FileResponse
 
 from app.entities.sessao import SessaoAtual
 from app.entities.veiculo_foto import TAMANHO_MAXIMO_BYTES
@@ -65,7 +64,7 @@ class FotoController:
 
     def arquivo(self, atual: SessaoAtual, veiculo_id: int, foto_id: int,
                 requisicao: Request) -> Response:
-        item = self._service.arquivo(atual.usuario, veiculo_id, foto_id)
+        item = self._service.imagem(atual.usuario, veiculo_id, foto_id)
         etiqueta = f'"foto-{item.foto.id}-{item.foto.tamanho_bytes}"'
         cabecalhos = {
             # O navegador pode guardar a imagem, mas precisa perguntar ao
@@ -77,4 +76,4 @@ class FotoController:
         }
         if requisicao.headers.get("if-none-match") == etiqueta:
             return Response(status_code=304, headers=cabecalhos)
-        return FileResponse(item.caminho, media_type=item.foto.tipo_mime, headers=cabecalhos)
+        return Response(content=item.conteudo, media_type=item.foto.tipo_mime, headers=cabecalhos)

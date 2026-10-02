@@ -16,10 +16,10 @@ from tests.test_manutencoes_api import (  # noqa: F401  (fixtures)
 )
 from tests.veiculo_utils import (  # noqa: F401  (fixtures)
     admin,
-    arquivos_na_pasta,
     banco,
     criar_veiculo,
     enviar_foto,
+    imagens_no_banco,
     pasta_fotos,
     paula,
     rafael,
@@ -565,10 +565,10 @@ def test_foto_ligada_ao_diagnostico(banco, paula, civic, hoje, pasta_fotos):
     assert paula.get(caminho(civic["id"], criado["id"])).json()["total_fotos"] == 1
 
     # Apagar o diagnóstico apaga a foto dele (linha e arquivo); a outra fica.
-    assert len(arquivos_na_pasta(pasta_fotos)) == 2
+    assert imagens_no_banco(banco) == 2
     assert paula.delete(caminho(civic["id"], criado["id"])).status_code == 204
     assert contar(banco, "veiculo_foto") == 1
-    assert len(arquivos_na_pasta(pasta_fotos)) == 1
+    assert imagens_no_banco(banco) == 1
 
 
 def test_foto_nao_liga_a_dois_registros_nem_a_outro_veiculo(banco, paula, civic, hoje):

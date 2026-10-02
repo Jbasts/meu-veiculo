@@ -5,10 +5,9 @@ import io
 import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
+from sqlalchemy import text
 
-from app.dependencias import obter_arquivos_de_foto
 from app.main import app
-from app.repositories.arquivo_foto_repository import ArquivoFotoRepository
 from tests.auth_utils import (
     CaixaDeEntrada,
     cadastrar,
@@ -65,9 +64,11 @@ def pasta_fotos(tmp_path):
 
 @pytest.fixture
 def banco(banco_migrado, pasta_fotos):
-    """Banco de teste migrado, com a API ligada a ele e a uma pasta de fotos temporária."""
+    """Banco de teste migrado, com a API ligada a ele.
+
+    pasta_fotos é uma pasta temporária vazia: desde a 0013 a API não usa pasta
+    nenhuma, e os testes conferem que nada é gravado nela."""
     ligar_app_ao_banco(banco_migrado, CaixaDeEntrada())
-    app.dependency_overrides[obter_arquivos_de_foto] = lambda: ArquivoFotoRepository(pasta_fotos)
     yield banco_migrado
     app.dependency_overrides.clear()
 
@@ -98,3 +99,9 @@ def arquivos_na_pasta(pasta) -> list[str]:
     if not pasta.is_dir():
         return []
     return sorted(p.relative_to(pasta).as_posix() for p in pasta.rglob("*") if p.is_file())
+
+
+def imagens_no_banco(engine) -> int:
+    """Quantas imagens estão guardadas no PostgreSQL (tabela foto_conteudo)."""
+    with engine.connect() as conexao:
+        return conexao.scalar(text("SELECT count(*) FROM foto_conteudo"))

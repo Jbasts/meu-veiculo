@@ -295,7 +295,7 @@ class PlanoService:
 
 class ManutencaoService:
     def __init__(self, uow: Transacional, veiculos, planos, manutencoes, leituras, fotos,
-                 arquivos, diagnosticos, *, hoje: Callable[[], date] = calendario.hoje):
+                 diagnosticos, *, hoje: Callable[[], date] = calendario.hoje):
         self._uow = uow
         self._diagnosticos = diagnosticos
         self._veiculos = veiculos
@@ -303,7 +303,6 @@ class ManutencaoService:
         self._manutencoes = manutencoes
         self._leituras = leituras
         self._fotos = fotos
-        self._arquivos = arquivos
         self._acesso = AcessoVeiculo(veiculos)
         self._hoje = hoje
 
@@ -584,7 +583,7 @@ class ManutencaoService:
         return self._detalhar(veiculo, manutencao)
 
     def apagar(self, usuario: Usuario, veiculo_id: int, manutencao_id: int) -> None:
-        """Apaga a manutenção, os itens dela e as fotos ligadas (linhas e arquivos)."""
+        """Apaga a manutenção, os itens dela e as fotos ligadas (o banco apaga em cascata)."""
         with self._uow.transacao():
             veiculo = self._acesso.exigir_para_alterar(usuario, veiculo_id, bloquear=True)
             manutencao = self._do_veiculo(veiculo, manutencao_id)
@@ -594,8 +593,4 @@ class ManutencaoService:
                          if diagnostico.status == RESOLVIDO else
                          f"A manutenção agendada \"{manutencao.descricao}\" foi apagada.")
                 self._diagnosticos.criar_nota(diagnostico.id, self._hoje(), texto)
-            # O banco apaga as linhas das fotos em cascata, mas não os arquivos.
-            arquivos = self._fotos.arquivos_da_manutencao(manutencao.id)
             self._manutencoes.apagar(manutencao)
-        for caminho in arquivos:
-            self._arquivos.apagar(caminho)

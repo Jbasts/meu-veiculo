@@ -1,13 +1,12 @@
 """Fotos de ponta a ponta: envio validado, arquivo protegido, capa e exclusão.
 
-Os arquivos vão para uma pasta temporária (fixture pasta_fotos); os
-metadados, para o PostgreSQL de teste.
+As imagens e os metadados ficam no PostgreSQL de teste (migration 0013);
+nada é gravado em pasta. A fixture pasta_fotos é usada só pelo comando
+importar-fotos, que lê a antiga pasta.
 """
 
 import io
-import os
 import threading
-import time
 
 import pytest
 from PIL import Image
@@ -26,6 +25,7 @@ from tests.veiculo_utils import (  # noqa: F401  (fixtures)
     criar_veiculo,
     enviar_foto,
     imagem,
+    imagens_no_banco,
     pasta_fotos,
     paula,
     rafael,
@@ -52,7 +52,7 @@ def capas_no_banco(banco, veiculo_id: int) -> list[int]:
 
 # ---------------------------------------------------------------------- envio
 
-def test_envia_foto_e_guarda_arquivo_fora_do_banco(banco, paula, civic, pasta_fotos):
+def test_envia_foto_e_guarda_a_imagem_no_banco(banco, paula, civic, pasta_fotos):
     resposta = enviar_foto(paula, civic["id"], nome="../../segredo.exe",
                            legenda="  Frente do carro ", data_foto="2026-09-20")
     assert resposta.status_code == 201, resposta.text
@@ -61,13 +61,18 @@ def test_envia_foto_e_guarda_arquivo_fora_do_banco(banco, paula, civic, pasta_fo
     assert corpo["data_foto"] == "2026-09-20" and corpo["principal"] is False
     assert "arquivo" not in corpo  # o caminho no servidor não é exposto
 
-    # Nome gerado pelo backend, dentro da pasta do veículo; o nome enviado é ignorado.
-    [caminho] = arquivos_na_pasta(pasta_fotos)
-    assert caminho.startswith(f"veiculos/{civic['id']}/") and caminho.endswith(".jpg")
-    assert "segredo" not in caminho
-    assert valor_sql(banco, "SELECT arquivo FROM veiculo_foto") == caminho
-    # O tamanho gravado é o do arquivo realmente guardado.
-    assert corpo["tamanho_bytes"] == (pasta_fotos / caminho).stat().st_size
+    # Nome de referência gerado pelo backend; o nome enviado é ignorado.
+    nome = valor_sql(banco, "SELECT arquivo FROM veiculo_foto")
+    assert nome.startswith(f"veiculos/{civic['id']}/") and nome.endswith(".jpg")
+    assert "segredo" not in nome
+    # A imagem está no banco, e o tamanho gravado é o dela.
+    assert imagens_no_banco(banco) == 1
+    assert corpo["tamanho_bytes"] == valor_sql(
+        banco, "SELECT octet_length(dados) FROM foto_conteudo WHERE foto_id = :f", f=corpo["id"])
+    baixada = paula.get(f"/api/veiculos/{civic['id']}/fotos/{corpo['id']}/arquivo")
+    assert len(baixada.content) == corpo["tamanho_bytes"]
+    # Nada foi gravado em pasta.
+    assert arquivos_na_pasta(pasta_fotos) == []
 
 
 @pytest.mark.parametrize("formato, tipo_esperado, extensao", [
@@ -82,8 +87,7 @@ def test_formatos_aceitos(banco, paula, civic, pasta_fotos, formato, tipo_espera
                            tipo="application/octet-stream")
     assert resposta.status_code == 201, resposta.text
     assert resposta.json()["tipo_mime"] == tipo_esperado
-    [caminho] = arquivos_na_pasta(pasta_fotos)
-    assert caminho.endswith(extensao)
+    assert valor_sql(banco, "SELECT arquivo FROM veiculo_foto").endswith(extensao)
     baixada = paula.get(f"/api/veiculos/{civic['id']}/fotos/{resposta.json()['id']}/arquivo")
     assert baixada.headers["content-type"] == tipo_esperado
     assert Image.open(io.BytesIO(baixada.content)).size == (80, 60)
@@ -105,7 +109,7 @@ def test_conteudo_invalido_e_recusado_mesmo_com_extensao_e_tipo_de_imagem(
     assert resposta.status_code == 422, resposta.text
     assert trecho in resposta.json()["campos"]["arquivo"]
     assert valor_sql(banco, "SELECT count(*) FROM veiculo_foto") == 0
-    assert arquivos_na_pasta(pasta_fotos) == []
+    assert imagens_no_banco(banco) == 0
 
 
 def test_tamanho_maximo_de_10_mb(banco, paula, civic, pasta_fotos):
@@ -129,7 +133,7 @@ def test_tamanho_maximo_de_10_mb(banco, paula, civic, pasta_fotos):
                           headers={"Content-Type": "multipart/form-data; boundary=x"})
     assert resposta.status_code == 413
     assert valor_sql(banco, "SELECT count(*) FROM veiculo_foto") == 0
-    assert arquivos_na_pasta(pasta_fotos) == []
+    assert imagens_no_banco(banco) == 0
 
 
 def test_foto_grande_e_reduzida_e_metadados_sao_removidos(banco, paula, civic):
@@ -160,7 +164,7 @@ def test_validacao_dos_campos_da_foto(banco, paula, civic, pasta_fotos):
     assert resposta.status_code == 422 and "Legenda longa" in resposta.json()["campos"]["legenda"]
     resposta = paula.post(f"/api/veiculos/{civic['id']}/fotos", data={"legenda": "sem arquivo"})
     assert resposta.status_code == 422 and resposta.json()["campos"] == {"arquivo": "Campo obrigatório."}
-    assert arquivos_na_pasta(pasta_fotos) == []
+    assert imagens_no_banco(banco) == 0
 
 
 def test_sem_data_a_foto_fica_com_a_data_de_hoje(banco, paula, civic):
@@ -190,11 +194,11 @@ def test_conhecer_o_endereco_da_foto_nao_da_acesso(banco, paula, rafael, civic, 
         enviar_foto(rafael, civic["id"]),
     ):
         assert resposta.status_code == 404, resposta.request.url
-    assert len(arquivos_na_pasta(pasta_fotos)) == 1
+    assert imagens_no_banco(banco) == 1
     assert valor_sql(banco, "SELECT count(*) FROM veiculo_foto") == 1
 
-    # Não existe caminho público para a pasta de fotos.
-    [caminho] = arquivos_na_pasta(pasta_fotos)
+    # Não existe caminho público que leve à imagem pelo nome de referência.
+    caminho = valor_sql(banco, "SELECT arquivo FROM veiculo_foto")
     for endereco in (f"/{caminho}", f"/api/{caminho}", f"/storage/{caminho}"):
         assert paula.get(endereco).status_code == 404
 
@@ -331,92 +335,98 @@ def test_veiculo_inativo_mostra_as_fotos_mas_nao_aceita_alteracoes(banco, paula,
     for resposta in (enviar_foto(paula, civic["id"]), paula.delete(f"{base}/{foto['id']}"),
                      paula.post(f"{base}/{foto['id']}/capa")):
         assert resposta.status_code == 409 and "inativo" in resposta.json()["mensagem"]
-    assert len(arquivos_na_pasta(pasta_fotos)) == 1
+    assert imagens_no_banco(banco) == 1
 
 
-# ------------------------------------------- arquivo e banco andando juntos
+# --------------------------------------------- foto e imagem andando juntas
 
-def test_apagar_foto_remove_a_linha_e_o_arquivo(banco, paula, civic, pasta_fotos):
+def test_apagar_foto_remove_a_linha_e_a_imagem(banco, paula, civic):
     foto = enviar_foto(paula, civic["id"], principal="true").json()
     outra = enviar_foto(paula, civic["id"]).json()
     caminho = f"/api/veiculos/{civic['id']}/fotos/{foto['id']}"
     assert paula.delete(caminho).status_code == 204
     assert paula.get(f"{caminho}/arquivo").status_code == 404
     assert [f["id"] for f in fotos(paula, civic["id"])["itens"]] == [outra["id"]]
-    assert len(arquivos_na_pasta(pasta_fotos)) == 1
+    assert imagens_no_banco(banco) == 1
     assert paula.get(f"/api/veiculos/{civic['id']}").json()["foto_capa_id"] is None
     assert paula.delete(caminho).status_code == 404
 
 
-def test_falha_no_banco_depois_de_gravar_o_arquivo_nao_deixa_sobra(banco, paula, civic,
-                                                                     pasta_fotos, monkeypatch):
-    gravados: list[list[str]] = []
-
+def test_falha_ao_gravar_a_imagem_desfaz_a_foto(banco, paula, civic, monkeypatch):
     def falhar(self, *args, **kwargs):
-        gravados.append(arquivos_na_pasta(pasta_fotos))  # o arquivo já estava lá
         raise RuntimeError("falha forçada no banco")
 
-    monkeypatch.setattr(FotoRepository, "criar", falhar)
+    monkeypatch.setattr(FotoRepository, "salvar_conteudo", falhar)
     with pytest.raises(RuntimeError, match="falha forçada"):
-        enviar_foto(paula, civic["id"])
-    assert len(gravados[0]) == 1
-    assert arquivos_na_pasta(pasta_fotos) == []
+        enviar_foto(paula, civic["id"], principal="true")
+    # A linha da foto (já criada) foi desfeita junto: nada pela metade.
     assert valor_sql(banco, "SELECT count(*) FROM veiculo_foto") == 0
+    assert imagens_no_banco(banco) == 0
 
 
-def test_arquivo_sumido_da_pasta_responde_nao_encontrado(banco, paula, civic, pasta_fotos):
+def test_foto_sem_imagem_responde_nao_encontrado(banco, paula, civic):
+    """Caso de foto antiga cujo arquivo já tinha sumido antes da 0013."""
     foto = enviar_foto(paula, civic["id"]).json()
-    [caminho] = arquivos_na_pasta(pasta_fotos)
-    (pasta_fotos / caminho).unlink()
+    executar_sql(banco, "DELETE FROM foto_conteudo WHERE foto_id = :f", f=foto["id"])
     resposta = paula.get(f"/api/veiculos/{civic['id']}/fotos/{foto['id']}/arquivo")
     assert resposta.status_code == 404
     assert "não está mais disponível" in resposta.json()["mensagem"]
+    assert fotos(paula, civic["id"])["total"] == 1  # continua na galeria
 
 
-def test_limpeza_de_arquivos_orfaos_pelo_terminal(banco, paula, civic, pasta_fotos, capsys):
+def test_banco_recusa_imagem_vazia(banco, paula, civic):
+    foto = enviar_foto(paula, civic["id"]).json()
+    with pytest.raises(Exception):
+        executar_sql(banco, "UPDATE foto_conteudo SET dados = '' WHERE foto_id = :f", f=foto["id"])
+
+
+def test_apagar_veiculo_direto_no_banco_apaga_as_imagens(banco, paula, civic):
     enviar_foto(paula, civic["id"])
-    sumida = enviar_foto(paula, civic["id"]).json()
-    registrada, da_sumida = arquivos_na_pasta(pasta_fotos)
-    if valor_sql(banco, "SELECT arquivo FROM veiculo_foto WHERE id = :i", i=sumida["id"]) != da_sumida:
-        registrada, da_sumida = da_sumida, registrada
-    (pasta_fotos / da_sumida).unlink()  # linha no banco sem arquivo
-
-    pasta_orfa = pasta_fotos / "veiculos" / "999"
-    pasta_orfa.mkdir(parents=True)
-    antigo, recente = pasta_orfa / "antigo.jpg", pasta_orfa / "recente.jpg"
-    antigo.write_bytes(b"x")
-    recente.write_bytes(b"x")
-    duas_horas_atras = time.time() - 7200
-    os.utime(antigo, (duas_horas_atras, duas_horas_atras))
-
-    gerenciar(["limpar-fotos", "--teste", "--pasta", str(pasta_fotos)])
-    saida = capsys.readouterr().out
-    assert "Arquivos sem registro no banco (com mais de 1 hora): 1" in saida
-    assert "veiculos/999/antigo.jpg" in saida and "recente.jpg" not in saida
-    assert "Nada foi apagado" in saida
-    assert "Fotos no banco sem arquivo na pasta: 1" in saida and da_sumida in saida
-    assert antigo.exists()  # sem --apagar, só lista
-
-    gerenciar(["limpar-fotos", "--teste", "--pasta", str(pasta_fotos), "--apagar"])
-    assert "Apagados: 1" in capsys.readouterr().out
-    assert not antigo.exists()
-    # O arquivo recente (envio possivelmente em andamento) e o registrado ficam.
-    assert recente.exists() and (pasta_fotos / registrada).exists()
-
-
-def test_apagar_veiculo_direto_no_banco_deixa_arquivo_orfao_que_a_limpeza_encontra(
-        banco, paula, civic, pasta_fotos, capsys):
-    """O banco apaga os metadados em cascata, mas não o arquivo: a limpeza cuida disso."""
-    enviar_foto(paula, civic["id"])
-    [caminho] = arquivos_na_pasta(pasta_fotos)
     executar_sql(banco, "DELETE FROM veiculo WHERE id = :v", v=civic["id"])
     assert valor_sql(banco, "SELECT count(*) FROM veiculo_foto") == 0
-    duas_horas_atras = time.time() - 7200
-    os.utime(pasta_fotos / caminho, (duas_horas_atras, duas_horas_atras))
-    gerenciar(["limpar-fotos", "--teste", "--pasta", str(pasta_fotos), "--apagar"])
-    assert "Apagados: 1" in capsys.readouterr().out
-    assert arquivos_na_pasta(pasta_fotos) == []
+    assert imagens_no_banco(banco) == 0  # cascata: nada sobra
 
+
+def test_importar_fotos_da_antiga_pasta_pelo_terminal(banco, paula, civic, pasta_fotos, capsys):
+    recuperavel = enviar_foto(paula, civic["id"]).json()
+    perdida = enviar_foto(paula, civic["id"]).json()
+    vazia = enviar_foto(paula, civic["id"]).json()
+    intacta = enviar_foto(paula, civic["id"]).json()
+    original = paula.get(f"/api/veiculos/{civic['id']}/fotos/{recuperavel['id']}/arquivo").content
+    nomes = {}
+    for foto in (recuperavel, perdida, vazia):
+        nomes[foto["id"]] = valor_sql(banco, "SELECT arquivo FROM veiculo_foto WHERE id = :f",
+                                      f=foto["id"])
+        executar_sql(banco, "DELETE FROM foto_conteudo WHERE foto_id = :f", f=foto["id"])
+    # Na pasta: o arquivo de uma, um arquivo vazio de outra, um arquivo de ninguém
+    # e um arquivo com o nome da foto intacta (que NÃO pode substituir a do banco).
+    for foto, conteudo in ((recuperavel, original), (vazia, b"")):
+        destino = pasta_fotos / nomes[foto["id"]]
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        destino.write_bytes(conteudo)
+    (pasta_fotos / "veiculos" / "999").mkdir(parents=True)
+    (pasta_fotos / "veiculos" / "999" / "solta.jpg").write_bytes(b"x")
+    nome_intacta = valor_sql(banco, "SELECT arquivo FROM veiculo_foto WHERE id = :f", f=intacta["id"])
+    (pasta_fotos / nome_intacta).write_bytes(b"nao e a imagem")
+
+    gerenciar(["importar-fotos", "--teste", "--pasta", str(pasta_fotos)])
+    saida = capsys.readouterr().out
+    assert "Fotos copiadas para o banco agora: 1" in saida and nomes[recuperavel["id"]] in saida
+    assert "sem arquivo na pasta: 1" in saida and nomes[perdida["id"]] in saida
+    assert "acima de 10 MB (não copiados): 1" in saida
+    assert "não são de nenhuma foto: 1" in saida and "veiculos/999/solta.jpg" in saida
+    assert "Nenhum arquivo foi apagado" in saida
+
+    base = f"/api/veiculos/{civic['id']}/fotos"
+    assert paula.get(f"{base}/{recuperavel['id']}/arquivo").content == original
+    assert paula.get(f"{base}/{perdida['id']}/arquivo").status_code == 404
+    assert paula.get(f"{base}/{intacta['id']}/arquivo").content != b"nao e a imagem"
+    assert len(arquivos_na_pasta(pasta_fotos)) == 4  # nada apagado
+
+    # Rodar de novo não duplica nem troca nada.
+    gerenciar(["importar-fotos", "--teste", "--pasta", str(pasta_fotos)])
+    assert "Fotos copiadas para o banco agora: 0" in capsys.readouterr().out
+    assert imagens_no_banco(banco) == 2
 
 # ------------------------------------------------------------ regras isoladas
 

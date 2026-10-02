@@ -43,7 +43,8 @@ class Configuracoes(BaseSettings):
     # Pasta onde os backups automáticos são gravados.
     pasta_backups: Path = PASTA_BACKEND / "backups"
 
-    # Pasta onde ficam os arquivos das fotos (fora do banco e fora do Git).
+    # ANTIGA pasta das fotos (até a 0013 as imagens ficavam aqui). Agora só é lida
+    # pela migration 0013 e pelo "gerenciar.py importar-fotos", que copiam para o banco.
     pasta_fotos: Path = PASTA_BACKEND / "storage"
 
     # Endereço do frontend, usado nos links enviados por e-mail.

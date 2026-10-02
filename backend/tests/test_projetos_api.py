@@ -8,7 +8,7 @@ from tests.auth_utils import valor_sql
 from tests.test_manutencoes_api import civic, hoje  # noqa: F401  (fixtures)
 from tests.veiculo_utils import (  # noqa: F401  (fixtures)
     admin,
-    arquivos_na_pasta,
+    imagens_no_banco,
     banco,
     criar_veiculo,
     enviar_foto,
@@ -197,11 +197,11 @@ def test_fotos_de_antes_e_depois_varias_e_a_primeira_no_cartao(banco, paula, civ
     so_depois = paula.get(f"/api/veiculos/{civic['id']}/fotos",
                           params={"projeto_id": p["id"], "momento": "depois"}).json()
     assert so_depois["total"] == 1
-    # Apagar o projeto apaga as fotos dele (linhas e arquivos).
-    assert len(arquivos_na_pasta(pasta_fotos)) == 4
+    # Apagar o projeto apaga as fotos dele (linhas e imagens).
+    assert imagens_no_banco(banco) == 4
     assert paula.delete(caminho(civic["id"], f"/{p['id']}")).status_code == 204
     assert valor_sql(banco, "SELECT count(*) FROM veiculo_foto") == 0
-    assert arquivos_na_pasta(pasta_fotos) == []
+    assert imagens_no_banco(banco) == 0
 
 
 def test_antes_e_depois_exigem_projeto_e_do_mesmo_veiculo(banco, paula, civic):

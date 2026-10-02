@@ -68,7 +68,6 @@ meu-veiculo/
 │   ├── alembic.ini              configuração das migrations
 │   ├── migrations/versions/     migrations numeradas (0001, 0002...)
 │   ├── tests/                   testes (pytest, PostgreSQL de teste)
-│   ├── storage/                 arquivos das fotos (fora do Git; criada no primeiro envio)
 │   └── app/
 │       ├── main.py              cria a API e registra as routes
 │       ├── config.py            lê o backend/.env
@@ -104,7 +103,7 @@ meu-veiculo/
 
 - **Frontend (React)**: as telas. Roda no navegador do computador ou do celular.
 - **API (FastAPI)**: recebe os pedidos das telas, confere permissões, aplica as regras e fala com o banco.
-- **Banco (PostgreSQL)**: guarda os dados. **Só o backend acessa o banco.** O celular nunca recebe endereço, usuário ou senha do PostgreSQL.
+- **Banco (PostgreSQL)**: guarda todos os dados, inclusive as imagens das fotos. **Só o backend acessa o banco.** O celular nunca recebe endereço, usuário ou senha do PostgreSQL.
 
 Em desenvolvimento, o frontend chama sempre `/api/...` no próprio endereço
 dele, e o Vite repassa a chamada para o backend (proxy, configurado em
@@ -407,7 +406,7 @@ não impede nada.
 | `A migration 0003 parou: há placas incompatíveis` | dois veículos da mesma conta ficariam com a mesma placa, ou placa com caractere inválido | seção 11.6 |
 | `Esta leitura não combina com o histórico` | a quilometragem informada contradiz outra leitura (dia anterior com km maior, ou dia posterior com km menor) | confira valor e data; se a leitura antiga é que está errada, use "Corrigir" no histórico (seção 11.2) |
 | `Envio grande demais` ou `Foto grande demais` | foto acima de 10 MB | reduza a resolução na câmera ou escolha outra foto |
-| Foto aparece como "Imagem indisponível" | o arquivo sumiu da pasta `backend\storage` | seção 11.5 |
+| Foto aparece como "Imagem indisponível" | foto antiga cujo arquivo já não estava na pasta quando as fotos foram para o banco (0013) | seção 11.5 |
 | Tela mostra `O banco de dados está na versão 0004 e o sistema precisa da 0005...` (HTTP 503) | o código foi atualizado com uma migration nova e o banco ainda não | `.\.venv\Scripts\python.exe gerenciar.py migrar` (pasta `backend`); não precisa reiniciar o backend (seção 12.5) |
 | `coluna ... não existe` (erro 500) no terminal do backend | mesma causa, em versão antiga do código sem o aviso 503 | `.\.venv\Scripts\python.exe gerenciar.py migrar` (pasta `backend`) |
 | Ao salvar a manutenção aparece "A data não pode ser anterior" | ela resolve um diagnóstico identificado depois dessa data | corrija a data da manutenção ou a do diagnóstico (seção 13.3) |
@@ -579,7 +578,7 @@ ou diagnóstico são corrigidas editando esse registro.
 | Conferência | o backend identifica o formato pelos primeiros bytes do arquivo e abre a imagem inteira. A extensão e o tipo informado pelo navegador não são levados em conta. |
 | Regravação | a imagem é regravada do zero: somem conteúdos escondidos e os metadados, inclusive a **localização GPS** que o celular grava. A rotação é aplicada antes. Fotos maiores que 2560 pontos no lado maior são reduzidas. |
 | HEIC | é o formato da câmera do iPhone, que o Chrome do Android não exibe. O backend converte para JPEG; o tipo e o tamanho gravados no banco são os do arquivo convertido. |
-| Onde ficam | arquivos em `backend\storage\veiculos\<id do veículo>\` (fora do Git), com nome gerado pelo backend. O banco guarda só os metadados. Para mudar a pasta: `PASTA_FOTOS` no `.env`. |
+| Onde ficam | **no PostgreSQL** (desde a migration 0013): a imagem na tabela `foto_conteudo` e os dados da foto (legenda, data, capa, vínculo) em `veiculo_foto`. Nenhum arquivo é gravado em pasta. A imagem fica numa tabela separada para a galeria listar as fotos sem carregar as imagens. |
 | Acesso | a pasta não é pública. A imagem sai por `/api/veiculos/{id}/fotos/{id}/arquivo`, que confere a sessão e o dono a cada pedido. Conhecer o endereço não dá acesso. |
 | Capa | no máximo uma por veículo (índice único no banco). A troca bloqueia a linha do veículo, então duas trocas simultâneas acontecem em sequência. |
 | Câmera | "Tirar foto" abre a câmera do celular; "Da galeria" abre os arquivos. Funciona também em `http://` na rede local, porque usa o campo de arquivo do navegador, não o acesso direto à câmera (seção 18). |
@@ -589,29 +588,36 @@ projeto (antes e depois), sempre do mesmo veículo (seções 12, 13 e 16).
 
 ### 11.4 Backup das fotos
 
-O backup do banco (`gerenciar.py backup`) **não inclui as fotos**. Copie também
-a pasta `backend\storage`. Exemplo (pasta `meu-veiculo`):
+As fotos estão no banco, então o backup do banco já as inclui (pasta `backend`):
 
 ```powershell
-Copy-Item -Recurse backend\storage D:\backup\meu-veiculo-fotos
+.\.venv\Scripts\python.exe gerenciar.py backup
 ```
 
-### 11.5 Arquivos órfãos
+Cada foto ocupa de 0,2 a 1 MB no banco (o backend reduz e regrava a imagem no
+envio), por isso o arquivo de backup cresce junto com a galeria.
 
-O arquivo é gravado antes da linha no banco e apagado depois dela. Se o
-computador desligar no meio, pode sobrar um arquivo sem registro (ninguém
-consegue acessá-lo, mas ocupa espaço). Para conferir (pasta `backend`):
+### 11.5 Fotos que estavam na pasta `backend\storage` (antes da 0013)
 
-```powershell
-.\.venv\Scripts\python.exe gerenciar.py limpar-fotos
-```
+Até a etapa 10, as imagens ficavam na pasta `backend\storage`. A migration
+0013 (aplicada pelo `gerenciar.py migrar`) **copia cada imagem dessa pasta
+para o banco** e não apaga nada. No terminal ela mostra, por exemplo:
+`0013: 6 de 6 fotos copiadas da pasta ... para o banco`.
 
-O comando só **lista**: arquivos sem registro com mais de 1 hora, e fotos do
-banco cujo arquivo sumiu. Para apagar os arquivos sem registro:
+- Se alguma foto não tinha arquivo na pasta, ela aparece na lista do terminal e
+  continua na galeria como "Imagem indisponível" (nada é inventado).
+- Se o arquivo aparecer depois (por exemplo, `PASTA_FOTOS` apontava para outra
+  pasta, ou você restaurou a pasta de um backup), rode (pasta `backend`):
 
-```powershell
-.\.venv\Scripts\python.exe gerenciar.py limpar-fotos --apagar
-```
+  ```powershell
+  .\.venv\Scripts\python.exe gerenciar.py importar-fotos
+  ```
+
+  Ele copia para o banco só as fotos que ainda estão sem imagem, nunca troca
+  uma imagem que já está no banco e não apaga nada. Para ler outra pasta:
+  `... gerenciar.py importar-fotos --pasta D:\caminho\da\pasta`.
+- Depois de conferir no app que todas as fotos aparecem, a pasta
+  `backend\storage` pode ser apagada: o sistema não lê mais dela.
 
 ### 11.6 Se a migration 0003 parar por causa de placas antigas
 

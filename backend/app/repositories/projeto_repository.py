@@ -85,10 +85,6 @@ class ProjetoRepository:
         return self._sessao.scalar(
             select(func.count()).select_from(VeiculoFoto).where(VeiculoFoto.projeto_id == projeto_id)) or 0
 
-    def arquivos_das_fotos(self, projeto_id: int) -> list[str]:
-        return list(self._sessao.scalars(
-            select(VeiculoFoto.arquivo).where(VeiculoFoto.projeto_id == projeto_id)))
-
     def criar(self, veiculo_id: int, dados: dict) -> Projeto:
         projeto = Projeto(veiculo_id=veiculo_id, **dados)
         self._sessao.add(projeto)
