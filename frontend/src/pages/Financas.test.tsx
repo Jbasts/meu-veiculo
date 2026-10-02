@@ -124,7 +124,7 @@ describe("Finanças: aba Gastos", () => {
     const vencidas = await screen.findByRole("region", { name: "Vencidas" });
     expect(within(vencidas).getByText("IPVA")).toBeInTheDocument();  // sem descrição: nome da categoria
     expect(within(vencidas).getByText("há 3 dias")).toBeInTheDocument();
-    const aVencer = screen.getByRole("region", { name: "A vencer" });
+    const aVencer = screen.getByRole("region", { name: "Gastos futuros" });
     expect(within(aVencer).getByText("Vence em 10/11/2026")).toBeInTheDocument();
     expect(within(aVencer).getByText("em 47 dias")).toBeInTheDocument();
 
@@ -204,17 +204,38 @@ describe("Novo gasto", () => {
     await userEvent.type(screen.getByLabelText("Descrição"), "Renovação do seguro");
     expect(screen.getByText("Hoje. Toque para alterar.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("switch", { name: "Já foi pago" }));
-    expect(screen.getByText("Vai aparecer em \"A vencer\" nas Finanças.")).toBeInTheDocument();
+    expect(screen.getByText(/aparece em "Gastos futuros" nas Finanças e no Início/)).toBeInTheDocument();
+    // Gasto futuro: só a data prevista (sem a data do gasto nem a do pagamento).
+    expect(screen.queryByLabelText("Data")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Salvar gasto" }));
-    expect(screen.getByText(/Informe o vencimento/)).toBeInTheDocument();
+    expect(screen.getByText(/Informe a data prevista/)).toBeInTheDocument();
     expect(chamadasPara(buscar, "POST /api/veiculos/7/gastos")).toHaveLength(0);
 
-    await userEvent.type(screen.getByLabelText("Vencimento"), "2026-11-10");
+    await userEvent.type(screen.getByLabelText("Data prevista (vencimento)"), "2026-11-10");
     await userEvent.click(screen.getByRole("button", { name: "Salvar gasto" }));
-    expect(await screen.findByText("Conta registrada em \"A vencer\".")).toBeInTheDocument();
+    expect(await screen.findByText("Gasto futuro registrado.")).toBeInTheDocument();
     expect(corpoJson(buscar, "POST /api/veiculos/7/gastos")).toEqual({
       categoria: "seguro", valor: "2400.00", descricao: "Renovação do seguro", data: HOJE,
       pago: false, data_vencimento: "2026-11-10", data_pagamento: null,
+    });
+  });
+
+  it("lança o IPVA do ano que vem como gasto futuro, já pelo botão das Finanças", async () => {
+    const buscar = apiFalsa({ ...BASE, "POST /api/veiculos/7/gastos": () => json(201, {
+      ...SALVO, categoria: "ipva", valor: "1645.00", descricao: "IPVA 2027",
+      data_vencimento: "2027-05-13" }) });
+    renderizarApp("/veiculos/7/gastos/novo?futuro=1");
+    expect(await screen.findByRole("heading", { name: "Gasto futuro" })).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Já foi pago" })).not.toBeChecked();
+    await userEvent.type(screen.getByLabelText("Valor"), "1.645,00");
+    await userEvent.click(screen.getByRole("radio", { name: "IPVA" }));
+    await userEvent.type(screen.getByLabelText("Descrição"), "IPVA 2027");
+    await userEvent.type(screen.getByLabelText("Data prevista (vencimento)"), "2027-05-13");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar gasto" }));
+    expect(await screen.findByText("Gasto futuro registrado.")).toBeInTheDocument();
+    expect(corpoJson(buscar, "POST /api/veiculos/7/gastos")).toEqual({
+      categoria: "ipva", valor: "1645.00", descricao: "IPVA 2027", data: HOJE,
+      pago: false, data_vencimento: "2027-05-13", data_pagamento: null,
     });
   });
 
@@ -267,7 +288,7 @@ describe("Novo gasto", () => {
     renderizarApp("/veiculos/7/gastos/20");
     await userEvent.click(await screen.findByRole("button", { name: "Apagar gasto" }));
     const dialogo = screen.getByRole("alertdialog");
-    expect(within(dialogo).getByText(/sai de "A vencer"/)).toBeInTheDocument();
+    expect(within(dialogo).getByText(/sai de "Gastos futuros"/)).toBeInTheDocument();
     expect(chamadasPara(buscar, "DELETE /api/veiculos/7/gastos/20")).toHaveLength(0);
     await userEvent.click(within(dialogo).getByRole("button", { name: "Apagar" }));
     expect(await screen.findByText("Gasto apagado.")).toBeInTheDocument();

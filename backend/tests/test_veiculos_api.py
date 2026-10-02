@@ -216,7 +216,7 @@ def test_nao_seleciona_veiculo_inativo(banco, paula):
 def test_inativar_preserva_o_historico_e_deixa_somente_leitura(banco, paula):
     civic = criar_veiculo(paula, placa="ABC-1234")
     argo = criar_veiculo(paula, placa="BRA2E19")
-    paula.post(f"/api/veiculos/{argo['id']}/leituras", json={"quilometragem": 86000})
+    paula.post(f"/api/veiculos/{argo['id']}/leituras", json={"quilometragem": 86000, "nivel": 4})
     executar_sql(banco,
                  "INSERT INTO gasto (veiculo_id, categoria, valor) VALUES (:v, 'multa', 130.16)",
                  v=argo["id"])
@@ -241,14 +241,14 @@ def test_inativar_preserva_o_historico_e_deixa_somente_leitura(banco, paula):
     # Inativo não aceita alterações.
     for resposta in (
         paula.put(caminho, json=dados_edicao(placa="BRA2E19", cor="Azul")),
-        paula.post(f"{caminho}/leituras", json={"quilometragem": 87000}),
+        paula.post(f"{caminho}/leituras", json={"quilometragem": 87000, "nivel": 4}),
     ):
         assert resposta.status_code == 409
         assert "inativo" in resposta.json()["mensagem"]
 
     # Reativar devolve tudo como estava.
     assert paula.post(f"{caminho}/reativar").json()["ativo"] is True
-    assert paula.post(f"{caminho}/leituras", json={"quilometragem": 87000}).status_code == 201
+    assert paula.post(f"{caminho}/leituras", json={"quilometragem": 87000, "nivel": 4}).status_code == 201
 
 
 def test_nao_existe_endpoint_para_apagar_veiculo(banco, paula):

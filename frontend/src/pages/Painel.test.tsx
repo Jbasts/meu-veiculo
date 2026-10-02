@@ -49,6 +49,8 @@ const PAINEL: PainelInicio = {
   custo_por_km: POR_KM,
   contas: { vencidas: 1, total_vencidas: "1200.00", vencem_hoje: 0 },
   tanque: { tamanho_pendente: false, marcacao_do_mes_pendente: false },
+  gastos_futuros: { quantidade: 0, total: "0.00", proximos: [] },
+  nivel_tanque: { disponivel: false, motivo: "Ainda não há nível registrado.", nivel: null, data: null, quilometragem: null, origem: null, km_desde: null, nivel_estimado: null, km_por_litro: null },
 };
 
 const SEM_DADOS: PainelInicio = {
@@ -65,6 +67,8 @@ const SEM_DADOS: PainelInicio = {
   },
   contas: { vencidas: 0, total_vencidas: "0.00", vencem_hoje: 0 },
   tanque: { tamanho_pendente: false, marcacao_do_mes_pendente: false },
+  gastos_futuros: { quantidade: 0, total: "0.00", proximos: [] },
+  nivel_tanque: { disponivel: false, motivo: "Ainda não há nível registrado.", nivel: null, data: null, quilometragem: null, origem: null, km_desde: null, nivel_estimado: null, km_por_litro: null },
 };
 
 function base(painel: PainelInicio) {
@@ -103,6 +107,41 @@ describe("Início", () => {
     expect(within(atalhos).getByRole("link", { name: "Gasto" })).toHaveAttribute("href", "/veiculos/7/gastos/novo");
     expect(within(atalhos).getByRole("link", { name: "Manutenção" })).toHaveAttribute("href", "/veiculos/7/manutencoes/nova");
     expect(within(atalhos).getByRole("link", { name: "Problema" })).toHaveAttribute("href", "/veiculos/7/diagnosticos/novo");
+  });
+
+  it("mostra os próximos gastos com o total e os mais próximos", async () => {
+    apiFalsa(base({
+      ...PAINEL,
+      gastos_futuros: {
+        quantidade: 4, total: "4245.22",
+        proximos: [
+          { id: 31, categoria: "lavagem", descricao: null, valor: "40.00", data_vencimento: "2026-10-02", dias: 0 },
+          { id: 32, categoria: "seguro", descricao: "Renovação", valor: "2400.00", data_vencimento: "2026-11-11", dias: 40 },
+          { id: 33, categoria: "ipva", descricao: "IPVA 2027", valor: "1645.00", data_vencimento: "2027-05-13", dias: 223 },
+        ],
+      },
+    }));
+    renderizarApp("/");
+    const cartao = await screen.findByRole("region", { name: "Próximos gastos" });
+    expect(cartao.textContent).toContain("R$ 4.245,22");
+    expect(cartao.textContent).toContain("4 gastos previstos");
+    const itens = within(cartao).getAllByRole("listitem").map((l) => l.textContent);
+    expect(itens).toEqual([
+      "Lavagem02/10/2026 · hojeR$ 40,00",
+      "Renovação11/11/2026 · em 40 diasR$ 2.400,00",
+      "IPVA 202713/05/2027 · em 223 diasR$ 1.645,00",
+    ]);
+    expect(within(cartao).getByRole("link", { name: /IPVA 2027/ })).toHaveAttribute("href", "/veiculos/7/gastos/33");
+    expect(within(cartao).getByRole("link", { name: "Ver todos" })).toHaveAttribute("href", "/financas");
+  });
+
+  it("sem gastos futuros, oferece lançar um", async () => {
+    apiFalsa(base(PAINEL));
+    renderizarApp("/");
+    const cartao = await screen.findByRole("region", { name: "Próximos gastos" });
+    expect(cartao.textContent).toContain("Nenhum gasto futuro lançado.");
+    expect(within(cartao).getByRole("link", { name: "Lançar gasto futuro" }))
+      .toHaveAttribute("href", "/veiculos/7/gastos/novo?futuro=1");
   });
 
   it("avisa contas vencidas em Precisa de atenção", async () => {

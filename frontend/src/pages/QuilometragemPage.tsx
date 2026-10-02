@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { Link } from "react-router";
 
 import Alerta from "../components/Alerta";
 import BotaoEnviar from "../components/BotaoEnviar";
 import CampoTexto from "../components/CampoTexto";
 import { Carregando, ErroComNovaTentativa } from "../components/EstadoDaTela";
 import { DialogoConfirmacao } from "../components/Formulario";
+import { SeletorDeNivel } from "../components/PecasTanque";
 import TopoComVoltar from "../components/TopoComVoltar";
 import { useVeiculos } from "../contexts/VeiculosContext";
 import { useEnvioFormulario } from "../hooks/useEnvioFormulario";
@@ -81,6 +83,7 @@ export default function QuilometragemPage() {
   const hoje = hojeIso();
   const [km, setKm] = useState("");
   const [data, setData] = useState(hoje);
+  const [nivel, setNivel] = useState<number | null>(null);
   const [sucesso, setSucesso] = useState<string | null>(null);
   const { enviando, erroGeral, errosCampo, setErrosCampo, enviar } = useEnvioFormulario();
 
@@ -126,6 +129,9 @@ export default function QuilometragemPage() {
     );
   }
 
+  // Só o elétrico não tem tanque: nos demais, o nível do combustível é obrigatório.
+  const temTanque = veiculo.tipo_combustivel !== "eletrico";
+
   async function depoisDeMudar(atualizado: Veiculo, mensagem: string) {
     setVeiculo(atualizado);
     setSucesso(mensagem);
@@ -141,16 +147,21 @@ export default function QuilometragemPage() {
     if (valor === null) erros.quilometragem = "Informe a quilometragem.";
     if (!data) erros.data_leitura = "Informe a data da leitura.";
     else if (data > hoje) erros.data_leitura = "A data da leitura não pode ser no futuro.";
+    if (temTanque && nivel === null) erros.nivel = "Informe o nível do combustível: ele entra no cálculo do consumo.";
     if (Object.keys(erros).length || valor === null) {
       setErrosCampo(erros);
       return;
     }
     await enviar(async () => {
-      const atualizado = await registrarLeitura(veiculo!.id, valor, data);
+      const atualizado = await registrarLeitura(veiculo!.id, valor, data, temTanque ? nivel : null);
       setKm("");
-      await depoisDeMudar(atualizado, atualizado.quilometragem === valor
+      setNivel(null);
+      const quilometragem = atualizado.quilometragem === valor
         ? "Quilometragem atualizada."
-        : "Leitura guardada no histórico. A quilometragem atual não mudou, porque já existe uma leitura maior.");
+        : "Leitura guardada no histórico. A quilometragem atual não mudou, porque já existe uma leitura maior.";
+      await depoisDeMudar(atualizado, temTanque
+        ? `${quilometragem} O nível do tanque entrou no cálculo do consumo.`
+        : quilometragem);
     });
   }
 
@@ -188,8 +199,15 @@ export default function QuilometragemPage() {
       {veiculo.ativo ? (
         <>
           <h2 className="titulo-secao">Nova leitura</h2>
-          {erroGeral && !errosCampo.quilometragem && !errosCampo.data_leitura
+          {erroGeral && !errosCampo.quilometragem && !errosCampo.data_leitura && !errosCampo.nivel
             && <Alerta tipo="erro">{erroGeral}</Alerta>}
+          {temTanque && veiculo.tanque_pendente ? (
+            <Alerta tipo="info">
+              Para atualizar o km, informe antes o tamanho do tanque no cadastro do veículo: é com ele
+              que o nível do combustível vira litros no consumo.{" "}
+              <Link to={`/veiculos/${veiculo.id}/editar`} className="link">Completar cadastro</Link>
+            </Alerta>
+          ) : (
           <form onSubmit={aoEnviar} noValidate>
             <div className="dupla">
               <CampoTexto rotulo="Quilometragem" inputMode="numeric" value={km} maxLength={9}
@@ -199,8 +217,14 @@ export default function QuilometragemPage() {
                 onChange={(e) => setData(e.target.value)} erro={errosCampo.data_leitura}
                 dica={data === hoje ? "Hoje. Toque para alterar." : undefined} />
             </div>
+            {temTanque && (
+              <SeletorDeNivel rotulo="Nível do combustível" valor={nivel} aoMudar={setNivel}
+                erro={errosCampo.nivel}
+                dica="Como está o marcador agora. Com ele, o consumo fica mais exato." />
+            )}
             <BotaoEnviar enviando={enviando} textoEnviando="Salvando…">Salvar leitura</BotaoEnviar>
           </form>
+          )}
         </>
       ) : (
         <Alerta tipo="info">Veículo inativo: o histórico pode ser consultado, mas não alterado.</Alerta>
@@ -230,7 +254,12 @@ export default function QuilometragemPage() {
             )}
             {leitura.valida && !leitura.editavel && (
               <p className="texto-suave leitura__motivo">
-                Para corrigir, edite o registro de {ORIGEM[leitura.origem].toLowerCase()}.
+                {leitura.origem === "medicao_tanque" && leitura.origem_id !== null ? (
+                  <>Para corrigir, <Link to={`/veiculos/${veiculo.id}/tanque/marcacoes/${leitura.origem_id}`}
+                    className="link">edite a marcação do tanque</Link>.</>
+                ) : (
+                  <>Para corrigir, edite o registro de {ORIGEM[leitura.origem].toLowerCase()}.</>
+                )}
               </p>
             )}
             {veiculo.ativo && leitura.editavel && corrigindo !== leitura.id && (

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import Alerta from "../components/Alerta";
 import BotaoEnviar from "../components/BotaoEnviar";
@@ -32,6 +32,8 @@ interface Campos {
 export default function GastoFormPage() {
   const { veiculo, carregando, erro, recarregar } = useVeiculoDaRota();
   const { gastoId } = useParams();
+  const [parametros] = useSearchParams();
+  const futuro = parametros.get("futuro") === "1";
   const id = gastoId && gastoId !== "novo" ? Number(gastoId) : null;
   const [existente, setExistente] = useState<Gasto | null>(null);
   const [erroDados, setErroDados] = useState<string | null>(null);
@@ -51,7 +53,7 @@ export default function GastoFormPage() {
     };
   }, [veiculo, id]);
 
-  const titulo = id ? "Gasto" : "Novo gasto";
+  const titulo = id ? "Gasto" : futuro ? "Gasto futuro" : "Novo gasto";
   if (carregando || (veiculo && id !== null && !existente && !erroDados)) {
     return <div className="pagina"><main className="conteudo conteudo--topo"><Carregando /></main></div>;
   }
@@ -66,12 +68,13 @@ export default function GastoFormPage() {
       </div>
     );
   }
-  return <Formulario key={existente?.id ?? "novo"} veiculo={veiculo} existente={existente} titulo={titulo} />;
+  return <Formulario key={existente?.id ?? "novo"} veiculo={veiculo} existente={existente} titulo={titulo}
+    futuro={futuro} />;
 }
 
-function camposIniciais(existente: Gasto | null, hoje: string): Campos {
+function camposIniciais(existente: Gasto | null, hoje: string, futuro: boolean): Campos {
   if (!existente) {
-    return { valor: "", categoria: "", descricao: "", data: hoje, pago: true, vencimento: "",
+    return { valor: "", categoria: "", descricao: "", data: hoje, pago: !futuro, vencimento: "",
       pagamento: hoje, pagamentoTocado: false };
   }
   return {
@@ -90,11 +93,13 @@ function financasDoGasto(veiculoId: number, gasto: Gasto): string {
   return `/veiculos/${veiculoId}/financas?ano=${ano}&mes=${mes}`;
 }
 
-function Formulario({ veiculo, existente, titulo }: { veiculo: Veiculo; existente: Gasto | null; titulo: string }) {
+function Formulario({ veiculo, existente, titulo, futuro }: {
+  veiculo: Veiculo; existente: Gasto | null; titulo: string; futuro: boolean;
+}) {
   const navegar = useNavigate();
   const hoje = hojeIso();
   const { enviando, erroGeral, errosCampo, setErrosCampo, enviar } = useEnvioFormulario();
-  const [campos, setCampos] = useState<Campos>(() => camposIniciais(existente, hoje));
+  const [campos, setCampos] = useState<Campos>(() => camposIniciais(existente, hoje, futuro));
   const [confirmando, setConfirmando] = useState(false);
   const [apagando, setApagando] = useState(false);
   const [erroApagar, setErroApagar] = useState<string | null>(null);
@@ -118,15 +123,15 @@ function Formulario({ veiculo, existente, titulo }: { veiculo: Veiculo; existent
     else if (valor === undefined) erros.valor = "Valor inválido. Exemplo: 2.400,00.";
     else if (/^0+\.00$/.test(valor)) erros.valor = "O valor precisa ser maior que zero.";
     if (!campos.categoria) erros.categoria = "Escolha a categoria.";
-    if (!campos.data) erros.data = "Informe a data.";
-    else if (campos.data > hoje) {
-      erros.data = "A data do gasto não pode ser no futuro. Para uma conta que ainda vai vencer, desligue \"Já foi pago\" e informe o vencimento.";
-    }
     if (campos.pago) {
+      if (!campos.data) erros.data = "Informe a data.";
+      else if (campos.data > hoje) {
+        erros.data = "A data de um gasto pago não pode ser no futuro. Para um gasto que ainda vai acontecer, desligue \"Já foi pago\".";
+      }
       if (!campos.pagamento && !antigoSemPagamento) erros.data_pagamento = "Informe a data do pagamento.";
       else if (campos.pagamento > hoje) erros.data_pagamento = "A data do pagamento não pode ser no futuro.";
     } else if (!campos.vencimento) {
-      erros.data_vencimento = "Informe o vencimento: ele faz a conta aparecer em \"A vencer\".";
+      erros.data_vencimento = "Informe a data prevista: ela faz o gasto aparecer em \"Gastos futuros\".";
     }
     if (Object.keys(erros).length || typeof valor !== "string" || !campos.categoria) {
       setErrosCampo(erros);
@@ -134,7 +139,9 @@ function Formulario({ veiculo, existente, titulo }: { veiculo: Veiculo; existent
     }
     const dados: DadosGasto = {
       categoria: campos.categoria, valor, descricao: campos.descricao.trim() || null,
-      data: campos.data, pago: campos.pago,
+      // Gasto futuro: a data prevista vai no vencimento; a data do lançamento é hoje
+      // (ou a que já estava gravada, na edição).
+      data: campos.pago || existente ? campos.data : hoje, pago: campos.pago,
       data_vencimento: campos.vencimento || null,
       data_pagamento: campos.pago ? campos.pagamento || null : null,
     };
@@ -148,7 +155,7 @@ function Formulario({ veiculo, existente, titulo }: { veiculo: Veiculo; existent
     if (deuCerto) {
       navegar(destino, {
         replace: true,
-        state: { mensagem: existente ? "Alterações salvas." : campos.pago ? "Gasto registrado." : "Conta registrada em \"A vencer\"." },
+        state: { mensagem: existente ? "Alterações salvas." : campos.pago ? "Gasto registrado." : "Gasto futuro registrado." },
       });
     }
   }
@@ -188,24 +195,27 @@ function Formulario({ veiculo, existente, titulo }: { veiculo: Veiculo; existent
             <CampoTexto rotulo="Descrição" value={campos.descricao} maxLength={150}
               placeholder="Ex.: Renovação do seguro (opcional)"
               onChange={(e) => mudar("descricao", e.target.value)} erro={errosCampo.descricao} />
-            <CampoTexto rotulo="Data" type="date" max={hoje} value={campos.data}
-              onChange={(e) => mudarData(e.target.value)} erro={errosCampo.data}
-              dica={campos.data === hoje ? "Hoje. Toque para alterar." : undefined} />
-
             <Chave titulo="Já foi pago" ligada={campos.pago} aoMudar={(pago) => mudar("pago", pago)}
               descricao={campos.pago ? "Entra nas despesas do mês do pagamento."
-                : "Vai aparecer em \"A vencer\" nas Finanças."} />
+                : "Gasto futuro ou conta a pagar: aparece em \"Gastos futuros\" nas Finanças e no Início, "
+                  + "e só entra nas despesas quando for pago."} />
 
             {campos.pago ? (
+              <>
+              <CampoTexto rotulo="Data" type="date" max={hoje} value={campos.data}
+                onChange={(e) => mudarData(e.target.value)} erro={errosCampo.data}
+                dica={campos.data === hoje ? "Hoje. Toque para alterar." : undefined} />
               <CampoTexto rotulo="Data do pagamento" type="date" max={hoje} value={campos.pagamento}
                 onChange={(e) => setCampos((atual) => ({ ...atual, pagamento: e.target.value, pagamentoTocado: true }))}
                 erro={errosCampo.data_pagamento}
                 dica={antigoSemPagamento && !campos.pagamento
                   ? `Não informada (gasto antigo): ele conta pela data do gasto, ${formatarDataIso(campos.data)}.`
                   : "O mês do pagamento é o mês em que o gasto entra nas despesas."} />
+              </>
             ) : (
-              <CampoTexto rotulo="Vencimento" type="date" value={campos.vencimento}
-                onChange={(e) => mudar("vencimento", e.target.value)} erro={errosCampo.data_vencimento} />
+              <CampoTexto rotulo="Data prevista (vencimento)" type="date" value={campos.vencimento}
+                onChange={(e) => mudar("vencimento", e.target.value)} erro={errosCampo.data_vencimento}
+                dica="Pode ser no futuro. Ex.: IPVA 2027, vencimento em 13/05/2027." />
             )}
 
             {podeAlterar && (
@@ -225,7 +235,7 @@ function Formulario({ veiculo, existente, titulo }: { veiculo: Veiculo; existent
         {confirmando && (
           <DialogoConfirmacao titulo="Apagar este gasto?" textoConfirmar="Apagar" perigo ocupado={apagando}
             aoCancelar={() => setConfirmando(false)} aoConfirmar={() => void apagar()}>
-            <p>{existente?.pago ? "O valor sai das despesas do mês." : "A conta sai de \"A vencer\"."} Não dá para desfazer.</p>
+            <p>{existente?.pago ? "O valor sai das despesas do mês." : "O gasto sai de \"Gastos futuros\"."} Não dá para desfazer.</p>
           </DialogoConfirmacao>
         )}
       </main>

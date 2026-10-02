@@ -89,6 +89,15 @@ class GastoRepository:
         ).one()
         return linha[0], Decimal(linha[1]).quantize(Decimal("0.01")), linha[2]
 
+    def futuros(self, veiculo_id: int, hoje: date, limite: int) -> tuple[int, Decimal, list[Gasto]]:
+        """Gastos futuros (pendentes que vencem hoje ou depois): (quantidade, total, os mais próximos)."""
+        condicoes = (Gasto.veiculo_id == veiculo_id, Gasto.pago.is_(False), Gasto.data_vencimento >= hoje)
+        quantidade, total = self._sessao.execute(
+            select(func.count(), func.coalesce(func.sum(Gasto.valor), 0)).where(*condicoes)).one()
+        proximos = list(self._sessao.scalars(
+            select(Gasto).where(*condicoes).order_by(Gasto.data_vencimento, Gasto.id).limit(limite)))
+        return quantidade, Decimal(total).quantize(Decimal("0.01")), proximos
+
     def pendentes(self, veiculo_id: int, limite: int, deslocamento: int) -> list[Gasto]:
         """Do vencimento mais antigo para o mais distante (vencidos primeiro)."""
         return list(self._sessao.scalars(

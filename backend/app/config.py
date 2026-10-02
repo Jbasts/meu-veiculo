@@ -32,6 +32,8 @@ class Configuracoes(BaseSettings):
     db_senha: SecretStr = Field(default=SecretStr(""))
     db_nome: str = "meu_veiculo"
     db_nome_teste: str = "meu_veiculo_teste"
+    # Banco só para a demonstração (dados de exemplo do "gerenciar.py carregar-exemplo").
+    db_nome_demo: str = "meu_veiculo_demo"
 
     # Usuário administrador do PostgreSQL, usado só pelo comando "criar-bancos".
     # A senha dele NÃO fica no .env: o comando pergunta na hora.

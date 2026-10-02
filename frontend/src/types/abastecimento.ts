@@ -172,6 +172,23 @@ export interface Comparacao {
   precos_simulados: boolean;
 }
 
+/** Último nível conhecido do tanque e a estimativa de agora (Início e Combustível). */
+export interface NivelTanque {
+  disponivel: boolean;
+  /** Por que não há nível (quando disponivel = false). */
+  motivo: string | null;
+  /** Oitavos do tanque (0 = vazio, 8 = cheio), do último registro. */
+  nivel: number | null;
+  data: string | null;
+  quilometragem: number | null;
+  origem: "marcacao" | "abastecimento" | null;
+  /** Km rodados desde o registro. */
+  km_desde: number | null;
+  /** Oitavos, estimativa de agora pelo consumo médio (só se rodou desde o registro). */
+  nivel_estimado: number | null;
+  km_por_litro: string | null;
+}
+
 export interface ResumoCombustivel {
   combustiveis: Combustivel[];
   medias: MediaConsumo[];
@@ -185,6 +202,7 @@ export interface ResumoCombustivel {
   marcacao_do_mes_pendente: boolean;
   /** Consumo por mês, do mais recente (até 12). */
   meses: MesConsumo[];
+  nivel_tanque: NivelTanque;
 }
 
 export interface DadosMarcacao {

@@ -81,6 +81,7 @@ class VeiculoResposta(BaseModel):
 class LeituraEntrada(_Entrada):
     quilometragem: int
     data_leitura: date | None = None  # vazio = hoje
+    nivel: int | None = None          # oitavos do tanque; obrigatório se o veículo tem tanque
 
 
 class CorrecaoLeituraEntrada(_Entrada):

@@ -554,3 +554,14 @@
   font-size: 0.9rem;
   color: var(--cor-texto-claro);
 }
+
+/* "Gastos futuros" e "Vencidas" com o total à direita do título. */
+.rotulo-secao--com-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.rotulo-secao--com-total span:last-child {
+  font-variant-numeric: tabular-nums;
+}

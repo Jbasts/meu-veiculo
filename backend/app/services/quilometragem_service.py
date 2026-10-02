@@ -10,6 +10,13 @@ Como funciona
 - Por isso, lançar uma leitura antiga (km menor, data anterior) nunca reduz
   a quilometragem atual.
 
+Atualizar km com o nível do combustível (regra da Paula, 02/10/2026)
+- Em veículo com tanque, o nível do marcador é obrigatório: a leitura entra
+  como MARCAÇÃO DO TANQUE (MedicaoTanqueService.registrar_km), que gera a
+  leitura do hodômetro e também é um ponto do cálculo do consumo. Para
+  corrigir, edite a marcação (aba Combustível).
+- Veículo elétrico não tem tanque: o km entra como leitura manual, sem nível.
+
 Coerência
 - O hodômetro só anda para a frente: uma leitura é recusada se contradiz
   outra (dia anterior com km maior, ou dia posterior com km menor). No mesmo
@@ -39,6 +46,7 @@ from app.services.acesso_veiculo import AcessoVeiculo
 from app.services.calendario import data_br, numero_br
 from app.services.erros import Conflito, DadosInvalidos, NaoEncontrado
 from app.services.paginacao import Pagina, limite_e_deslocamento
+from app.services.tanque import tem_tanque
 from app.services.veiculo_service import validar_quilometragem
 
 TAMANHO_MAXIMO_MOTIVO = 200
@@ -65,9 +73,11 @@ def _descrever(leitura: LeituraKm) -> str:
 
 
 class QuilometragemService:
-    def __init__(self, uow: Transacional, veiculos, leituras, *,
+    def __init__(self, uow: Transacional, veiculos, leituras, marcacoes=None, *,
                  hoje: Callable[[], date] = calendario.hoje):
+        """marcacoes: MedicaoTanqueService, que grava o km com o nível nos veículos com tanque."""
         self._uow = uow
+        self._marcacoes = marcacoes
         self._veiculos = veiculos
         self._leituras = leituras
         self._acesso = AcessoVeiculo(veiculos)
@@ -97,13 +107,27 @@ class QuilometragemService:
             )
 
     def registrar(self, usuario: Usuario, veiculo_id: int, quilometragem: int | None,
-                  data_leitura: date | None) -> Veiculo:
-        """Nova leitura manual ("Atualizar km"). Sem data, vale o dia de hoje."""
+                  data_leitura: date | None, nivel: int | None = None) -> Veiculo:
+        """Nova leitura ("Atualizar km"). Sem data, vale o dia de hoje.
+
+        Veículo com tanque: o nível do marcador é obrigatório e a leitura vira
+        marcação do tanque. Elétrico: leitura manual, sem nível."""
         quilometragem = validar_quilometragem(quilometragem)
         hoje = self._hoje()
         data_leitura = data_leitura or hoje
         if data_leitura > hoje:
             raise DadosInvalidos("A data da leitura não pode ser no futuro.", campo="data_leitura")
+        veiculo = self._acesso.exigir_para_alterar(usuario, veiculo_id)
+        if tem_tanque(veiculo.tipo_combustivel):
+            if nivel is None:
+                raise DadosInvalidos("Informe o nível do combustível: ele entra no cálculo do consumo.",
+                                     campo="nivel")
+            if self._marcacoes is None:
+                raise RuntimeError("QuilometragemService sem o serviço de marcação do tanque.")
+            return self._marcacoes.registrar_km(usuario, veiculo.id, quilometragem, data_leitura, nivel)
+        if nivel is not None:
+            raise DadosInvalidos("Veículo elétrico não tem tanque de combustível: informe só o km.",
+                                 campo="nivel")
         with self._uow.transacao():
             # Linha do veículo bloqueada: leituras simultâneas entram uma de cada vez.
             veiculo = self._acesso.exigir_para_alterar(usuario, veiculo_id, bloquear=True)

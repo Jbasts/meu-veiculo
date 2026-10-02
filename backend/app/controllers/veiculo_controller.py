@@ -72,7 +72,8 @@ class VeiculoController:
 
     def registrar_leitura(self, atual: SessaoAtual, veiculo_id: int,
                           dados: LeituraEntrada) -> VeiculoResposta:
-        self._km.registrar(atual.usuario, veiculo_id, dados.quilometragem, dados.data_leitura)
+        self._km.registrar(atual.usuario, veiculo_id, dados.quilometragem, dados.data_leitura,
+                           dados.nivel)
         return self._veiculo_atualizado(atual, veiculo_id)
 
     def corrigir_leitura(self, atual: SessaoAtual, veiculo_id: int, leitura_id: int,

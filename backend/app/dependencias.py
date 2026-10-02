@@ -142,7 +142,9 @@ def obter_veiculo_controller(sessao: SessaoDep) -> VeiculoController:
     veiculos = VeiculoRepository(sessao)
     return VeiculoController(
         VeiculoService(uow, veiculos, FotoRepository(sessao)),
-        QuilometragemService(uow, veiculos, LeituraKmRepository(sessao)),
+        QuilometragemService(uow, veiculos, LeituraKmRepository(sessao), MedicaoTanqueService(
+            uow, veiculos, AbastecimentoRepository(sessao), LeituraKmRepository(sessao),
+            MedicaoTanqueRepository(sessao))),
     )
 
 

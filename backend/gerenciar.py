@@ -17,6 +17,9 @@ Comandos:
                              (é o único jeito de criar o primeiro admin)
     importar-fotos [--pasta] copia para o banco as fotos que ainda estão só
                              na antiga pasta (nada é apagado)
+    carregar-exemplo         grava dados de exemplo no banco de DEMONSTRAÇÃO
+                             (DB_NOME_DEMO); nunca no de desenvolvimento.
+                             --recomecar apaga o banco de demonstração antes
 
 Use --teste para agir no banco de teste em vez do de desenvolvimento.
 """
@@ -67,8 +70,8 @@ def exigir_senha_da_aplicacao() -> None:
 def cmd_criar_bancos(_args: argparse.Namespace) -> None:
     cfg = obter_configuracoes()
     exigir_senha_da_aplicacao()
-    if cfg.db_nome == cfg.db_nome_teste:
-        raise SystemExit("DB_NOME e DB_NOME_TESTE precisam ser diferentes.")
+    if len({cfg.db_nome, cfg.db_nome_teste, cfg.db_nome_demo}) < 3:
+        raise SystemExit("DB_NOME, DB_NOME_TESTE e DB_NOME_DEMO precisam ser diferentes.")
 
     senha_admin = os.environ.get("PG_ADMIN_SENHA") or getpass.getpass(
         f"Senha do usuário '{cfg.pg_admin_usuario}' do PostgreSQL (não aparece ao digitar): "
@@ -101,7 +104,7 @@ def cmd_criar_bancos(_args: argparse.Namespace) -> None:
             )
             print(f"Usuário '{cfg.db_usuario}' criado (sem poderes de administrador).")
 
-        for nome in (cfg.db_nome, cfg.db_nome_teste):
+        for nome in (cfg.db_nome, cfg.db_nome_teste, cfg.db_nome_demo):
             banco = sql.Identifier(nome)
             existe = conexao.execute(
                 "SELECT 1 FROM pg_database WHERE datname = %s", (nome,)
@@ -215,6 +218,55 @@ def cmd_importar_fotos(args: argparse.Namespace) -> None:
           "depois de você conferir as fotos no app.")
 
 
+def nome_do_banco_demo() -> str:
+    """Trava: a carga de exemplo só grava num banco próprio, nunca no de verdade."""
+    cfg = obter_configuracoes()
+    nome = cfg.db_nome_demo
+    if not nome.endswith("_demo") or nome in (cfg.db_nome, cfg.db_nome_teste):
+        raise SystemExit(
+            f"Trava de segurança: DB_NOME_DEMO='{nome}' precisa terminar em '_demo' e ser "
+            "diferente de DB_NOME e DB_NOME_TESTE. A carga de exemplo nunca grava nos seus dados.")
+    return nome
+
+
+def cmd_carregar_exemplo(args: argparse.Namespace) -> None:
+    nome = nome_do_banco_demo()
+    exigir_senha_da_aplicacao()
+    try:
+        # Precisa do cliente de teste do FastAPI (requirements-dev.txt).
+        from demonstracao.carga_exemplo import EMAIL_ADMIN, EMAIL_PADRAO, SENHA_EXEMPLO, carregar
+    except ModuleNotFoundError as erro:
+        raise SystemExit(f"Falta uma biblioteca de desenvolvimento ({erro.name}). Rode: "
+                         ".\\.venv\\Scripts\\python.exe -m pip install -r requirements-dev.txt")
+    engine = criar_engine(nome)
+    try:
+        try:
+            with engine.connect() as conexao:
+                conexao.execute(sqlalchemy.text("SELECT 1"))
+        except sqlalchemy.exc.OperationalError:
+            raise SystemExit(f"Não consegui abrir o banco '{nome}'. Ele é criado pelo "
+                             "'gerenciar.py criar-bancos' (rode de novo: nada é apagado nos outros).")
+        if args.recomecar:
+            with engine.begin() as conexao:
+                conexao.execute(sqlalchemy.text("DROP SCHEMA IF EXISTS public CASCADE"))
+                conexao.execute(sqlalchemy.text("CREATE SCHEMA public"))
+            print(f"Banco '{nome}' esvaziado.")
+        # Sem reconfigurar o log do Alembic: banco só de demonstração, nada a relatar.
+        migrar(engine=engine, backup=False, configurar_logs=False)
+        with engine.connect() as conexao:
+            contas = conexao.execute(sqlalchemy.text("SELECT count(*) FROM usuario")).scalar()
+        if contas:
+            raise SystemExit(f"O banco '{nome}' já tem {contas} conta(s). Para apagar tudo e "
+                             "carregar de novo: gerenciar.py carregar-exemplo --recomecar")
+        resumo = carregar(engine)
+    finally:
+        engine.dispose()
+    print(f"Dados de exemplo gravados no banco '{nome}': {resumo.veiculos} veículos, "
+          f"{resumo.registros} registros e {resumo.fotos} fotos.")
+    print(f"Entre com {EMAIL_ADMIN} (administradora) ou {EMAIL_PADRAO}; senha: {SENHA_EXEMPLO}")
+    print("Para abrir o sistema com estes dados, veja a seção 20 do README.")
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Comandos do banco do Meu Veículo.")
     sub = parser.add_subparsers(dest="comando", required=True)
@@ -226,13 +278,17 @@ def main(argv: list[str] | None = None) -> None:
         ("backup", cmd_backup, "grava cópia do banco em backend/backups"),
         ("promover-admin", cmd_promover_admin, "torna administradora uma conta já cadastrada"),
         ("importar-fotos", cmd_importar_fotos, "copia para o banco fotos que ainda estão na pasta"),
+        ("carregar-exemplo", cmd_carregar_exemplo, "grava dados de exemplo no banco de demonstração"),
     ):
         p = sub.add_parser(nome, help=ajuda)
         p.set_defaults(funcao=funcao)
-        if nome != "criar-bancos":
+        if nome not in ("criar-bancos", "carregar-exemplo"):
             p.add_argument("--teste", action="store_true", help="usar o banco de teste")
         if nome == "promover-admin":
             p.add_argument("email", help="e-mail da conta (criada antes pela tela 'Criar conta')")
+        if nome == "carregar-exemplo":
+            p.add_argument("--recomecar", action="store_true",
+                           help="apaga tudo do banco de demonstração antes de carregar")
         if nome == "importar-fotos":
             p.add_argument("--pasta", type=Path, default=None,
                            help="pasta das fotos (padrão: PASTA_FOTOS do .env)")

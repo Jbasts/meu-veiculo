@@ -9,6 +9,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel
 
+from app.schemas.abastecimento_schema import NivelTanqueResposta
+
 
 class ParcelaResposta(BaseModel):
     grupo: str        # aquisicao | combustivel | manutencao | projeto | seguro | documentacao | outros
@@ -84,9 +86,26 @@ class ContasEmAtrasoResposta(BaseModel):
     vencem_hoje: int
 
 
+class ProximoGastoResposta(BaseModel):
+    id: int
+    categoria: str
+    descricao: str | None
+    valor: Decimal
+    data_vencimento: date
+    dias: int                   # dias até a data prevista (0 = hoje)
+
+
+class GastosFuturosResposta(BaseModel):
+    quantidade: int
+    total: Decimal
+    proximos: list[ProximoGastoResposta]
+
+
 class PainelInicioResposta(BaseModel):
     gastos_do_mes: GastosDoMesResposta
     consumo: ConsumoMedioResposta
     custo_por_km: CustoPorKmResposta
     contas: ContasEmAtrasoResposta
     tanque: AvisosDoTanqueResposta
+    gastos_futuros: GastosFuturosResposta
+    nivel_tanque: NivelTanqueResposta

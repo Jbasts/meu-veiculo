@@ -33,6 +33,7 @@ const RESUMO: ResumoCombustivel = {
   postos_recentes: ["Shell", "Ipiranga"],
   ultima_quilometragem: 85000,
   capacidade_tanque: "56.0", tanque_pendente: false, marcacao_do_mes_pendente: false, meses: [],
+  nivel_tanque: { disponivel: false, motivo: "Ainda não há nível registrado.", nivel: null, data: null, quilometragem: null, origem: null, km_desde: null, nivel_estimado: null, km_por_litro: null },
 };
 const SEM_DADOS: ResumoCombustivel = {
   ...RESUMO, medias: [], postos_recentes: [],

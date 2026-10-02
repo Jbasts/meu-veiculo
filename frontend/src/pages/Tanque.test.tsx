@@ -30,6 +30,7 @@ const RESUMO: ResumoCombustivel = {
   combustiveis: ["gasolina", "etanol"], medias: [MEDIA], comparacao: null, postos_recentes: [],
   ultima_quilometragem: 85000, capacidade_tanque: "56.0", tanque_pendente: false,
   marcacao_do_mes_pendente: true, meses: [{ ...MEDIA, ano: 2026, mes: 9 }],
+  nivel_tanque: { disponivel: false, motivo: "Ainda não há nível registrado.", nivel: null, data: null, quilometragem: null, origem: null, km_desde: null, nivel_estimado: null, km_por_litro: null },
 };
 
 const MARCACAO: MarcacaoTanque = {
@@ -141,6 +142,8 @@ describe("Início com os avisos do tanque", () => {
       km_inicio: null, km_fim: null, distancia: null, despesas: null, valor: null, parcelas: [] },
     contas: { vencidas: 0, total_vencidas: "0.00", vencem_hoje: 0 },
     tanque: { tamanho_pendente: true, marcacao_do_mes_pendente: true },
+    gastos_futuros: { quantidade: 0, total: "0.00", proximos: [] },
+    nivel_tanque: { disponivel: false, motivo: "Ainda não há nível registrado.", nivel: null, data: null, quilometragem: null, origem: null, km_desde: null, nivel_estimado: null, km_por_litro: null },
   };
 
   it("mostra o consumo estimado e os dois avisos em Precisa de atenção", async () => {
@@ -160,5 +163,67 @@ describe("Início com os avisos do tanque", () => {
     const consumo = screen.getByRole("link", { name: "Consumo médio" });
     expect(consumo.textContent).toContain("≈ 10,0");
     expect(consumo.textContent).toContain("Pelo marcador: entre 8,9 e 11,4");
+  });
+});
+
+describe("Nível do tanque no Início, na aba Combustível e no abastecimento", () => {
+  const ESTIMADO = {
+    disponivel: true, motivo: null, nivel: 8, data: "2026-09-30", quilometragem: 84500,
+    origem: "abastecimento" as const, km_desde: 500, nivel_estimado: 2, km_por_litro: "12.5",
+  };
+  const REGISTRADO = { ...ESTIMADO, nivel: 6, origem: "marcacao" as const, km_desde: 0, nivel_estimado: null,
+    km_por_litro: null };
+  const INICIO = {
+    "GET /api/veiculos/7/manutencoes/pendentes": () => json(200, { km_atual: 85000, itens: [] }),
+    "GET /api/veiculos/7/diagnosticos?filtro=abertos&pagina=1&por_pagina=5": () => json(200, {
+      itens: [], total: 0, pagina: 1, por_pagina: 5 }),
+  };
+  const PAINEL_BASE: PainelInicio = {
+    gastos_do_mes: { ano: 2026, mes: 10, total: "0.00", quantidade: 0, parcelas: [] },
+    consumo: { disponivel: false, motivo: "Sem dados.", combustivel: null, valor: null, ciclos: 0, distancia: null,
+      quantidade: null, inicio: null, fim: null, estimado: false, minimo: null, maximo: null },
+    custo_por_km: { disponivel: false, motivo: "Sem dados.", base: null, aviso_base: null, inicio: null, fim: null,
+      km_inicio: null, km_fim: null, distancia: null, despesas: null, valor: null, parcelas: [] },
+    contas: { vencidas: 0, total_vencidas: "0.00", vencem_hoje: 0 },
+    tanque: { tamanho_pendente: false, marcacao_do_mes_pendente: false },
+    gastos_futuros: { quantidade: 0, total: "0.00", proximos: [] },
+    nivel_tanque: ESTIMADO,
+  };
+
+  it("Início mostra a estimativa de agora e de onde ela vem", async () => {
+    apiFalsa({ ...BASE, ...INICIO, "GET /api/veiculos/7/painel": () => json(200, PAINEL_BASE) });
+    renderizarApp("/");
+    const cartao = await screen.findByRole("region", { name: "Nível do tanque" });
+    expect(cartao.textContent).toContain("≈ 1/4");
+    expect(cartao.textContent).toContain("Cheio no abastecimento de 30/09/2026, depois 500 km rodados a 12,5 km/L");
+    expect(within(cartao).getByRole("link", { name: "Atualizar km e nível" })).toHaveAttribute("href", "/veiculos/7/km");
+  });
+
+  it("Início sem registro mostra dados insuficientes, nunca um nível inventado", async () => {
+    apiFalsa({ ...BASE, ...INICIO, "GET /api/veiculos/7/painel": () => json(200, {
+      ...PAINEL_BASE, nivel_tanque: RESUMO.nivel_tanque }) });
+    renderizarApp("/");
+    const cartao = await screen.findByRole("region", { name: "Nível do tanque" });
+    expect(cartao.textContent).toContain("Dados insuficientes");
+    expect(cartao.textContent).toContain("Ainda não há nível registrado.");
+    expect(cartao.textContent).not.toMatch(/Vazio|Cheio/);
+  });
+
+  it("aba Combustível mostra o nível registrado sem estimar quando não rodou", async () => {
+    apiFalsa({ ...BASE, "GET /api/veiculos/7/combustivel/resumo": () => json(200, {
+      ...RESUMO, nivel_tanque: REGISTRADO }) });
+    renderizarApp("/financas?aba=combustivel");
+    const cartao = await screen.findByRole("region", { name: "Nível do tanque" });
+    expect(cartao.textContent).toContain("3/4");
+    expect(cartao.textContent).not.toContain("≈");
+    expect(cartao.textContent).toContain("Registrado: 3/4 em 30/09/2026.");
+  });
+
+  it("formulário de abastecimento lembra o último nível ao lado do marcador", async () => {
+    apiFalsa({ ...BASE, "GET /api/veiculos/7/combustivel/resumo": () => json(200, {
+      ...RESUMO, nivel_tanque: ESTIMADO }) });
+    renderizarApp("/veiculos/7/abastecimentos/novo");
+    expect(await screen.findByText(/Último nível: Cheio no abastecimento de 30\/09\/2026 \(≈ 1\/4 agora\)\./))
+      .toBeInTheDocument();
   });
 });

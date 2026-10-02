@@ -36,6 +36,7 @@ FastAPI (Python) no backend e PostgreSQL no banco de dados.
 17. [Início, custo do veículo, histórico e administração](#17-início-custo-do-veículo-histórico-e-administração)
 18. [Usar pelo celular (rede local) e instalar como aplicativo](#18-usar-pelo-celular-rede-local-e-instalar-como-aplicativo)
 19. [O que foi testado e o que depende do seu ambiente](#19-o-que-foi-testado-e-o-que-depende-do-seu-ambiente)
+20. [Dados de exemplo para apresentação](#20-dados-de-exemplo-para-apresentação)
 
 ---
 
@@ -68,6 +69,7 @@ meu-veiculo/
 │   ├── alembic.ini              configuração das migrations
 │   ├── migrations/versions/     migrations numeradas (0001, 0002...)
 │   ├── tests/                   testes (pytest, PostgreSQL de teste)
+│   ├── demonstracao/            carga OPCIONAL de dados de exemplo (seção 20)
 │   └── app/
 │       ├── main.py              cria a API e registra as routes
 │       ├── config.py            lê o backend/.env
@@ -544,6 +546,21 @@ usuário e senha, e veja as mensagens em http://localhost:8025.
 Cada atualização é uma **leitura**: o valor e o dia em que o hodômetro marcava
 esse valor. A tabela `leitura_km` guarda também quando a leitura foi digitada.
 
+**Atualizar km pede o nível do combustível** (regra de negócio, conferida no
+backend): em todo veículo com tanque, a tela "Atualizar km" pede também como
+está o marcador (vazio, 0,5/4 ... cheio). A leitura entra como **marcação do
+tanque** (seção 15.3), que é mais um ponto do cálculo do consumo e também
+resolve o aviso "marcação do mês". Sem o nível, o backend recusa
+("Informe o nível do combustível"). Exceções:
+
+- veículo **elétrico** (não tem tanque): só o km, como antes;
+- veículo antigo **sem o tamanho do tanque** no cadastro: a tela pede para
+  completar o cadastro antes ("Completar cadastro"), porque é o tamanho que
+  transforma o nível em litros.
+
+Uma leitura feita assim é corrigida **editando a marcação** (o histórico mostra
+o link "edite a marcação do tanque"), como as leituras de abastecimento.
+
 - A quilometragem atual é sempre a **maior leitura válida**, e a data mostrada
   na tela é a data dessa leitura. Quem calcula é o banco, a cada mudança.
 - Registro antigo (km menor) entra no histórico e **não reduz** a quilometragem atual.
@@ -567,8 +584,10 @@ esse valor. A tabela `leitura_km` guarda também quando a leitura foi digitada.
    leituras válidas, então refletem a correção.
 
 "Anular" retira uma leitura que não deveria existir (não é possível anular a
-única leitura do veículo). Leituras que vieram de um abastecimento, manutenção
-ou diagnóstico são corrigidas editando esse registro.
+única leitura do veículo). "Corrigir" e "Anular" valem para a leitura do
+cadastro, as herdadas e as do elétrico. Leituras que vieram de um
+abastecimento, manutenção, diagnóstico ou marcação do tanque (inclusive as do
+"Atualizar km" com nível) são corrigidas editando esse registro.
 
 ### 11.3 Fotos
 
@@ -838,14 +857,28 @@ em 24/09 como pendente (vence 10/11) e pago em 08/11 entra em **novembro**.
   pagamento. Ela não é inventada: esses contam pela data do gasto, e a tela
   avisa "Não informada (gasto antigo)".
 
-### 14.3 Contas pendentes
+### 14.3 Gastos futuros e contas pendentes
 
-Gasto pendente exige **vencimento** (o banco também confere). Ele aparece em:
+Um gasto que ainda vai acontecer (por exemplo, **IPVA 2027, R$ 1.645,00,
+vencimento em 13/05/2027**) é lançado assim:
 
-- **Vencidas**: vencimento antes de hoje ("há 3 dias");
-- **A vencer**: vence hoje ou depois ("em 47 dias").
+1. Finanças → **Lançar gasto futuro** (ou o "+" e desligue **Já foi pago**).
+2. Informe valor, categoria, descrição e a **Data prevista (vencimento)**, que
+   pode ser em qualquer dia do futuro.
 
-As listas mostram todas as contas pendentes do veículo, de qualquer mês.
+Ele aparece em:
+
+- **Gastos futuros** (Finanças): vencem hoje ou depois ("em 223 dias"), com o
+  total no título;
+- **Vencidas** (Finanças): a data passou e ainda não foi pago ("há 3 dias");
+  também em "Precisa de atenção" no Início;
+- **Próximos gastos** (Início): o total, a quantidade e os três mais próximos,
+  com o link "Ver todos".
+
+Gasto futuro **não entra** nas despesas nem nos gastos do mês: só conta quando
+você toca em **Marcar como pago**, no mês do pagamento. As listas mostram
+todos os gastos pendentes do veículo, de qualquer mês (o banco exige a data
+prevista em todo gasto não pago).
 
 ### 14.4 Por categoria e arredondamento
 
@@ -966,6 +999,19 @@ Para que serve:
   mês não for feita, o Início e a aba Combustível lembram. A quilometragem
   vira leitura do hodômetro (como no abastecimento) e apagar a marcação
   retira a leitura.
+
+**Nível do tanque** (cartão no Início e na aba Combustível, e lembrete no
+formulário de abastecimento, ao lado do marcador):
+
+- Vem do registro mais recente do tanque: a marcação (inclusive a do
+  "Atualizar km"), o abastecimento de tanque cheio (= cheio) ou o abastecimento
+  parcial com o nível antes (nível antes + litros abastecidos). GNV e recarga
+  elétrica não mexem nesse tanque.
+- Se o carro rodou depois desse registro e já existe consumo médio, a tela
+  mostra a **estimativa de agora**, com "≈": litros gastos = km rodados ÷ km/L.
+  Ex.: cheio (56 L) e 500 km a 12,5 km/L → 40 L gastos → sobram 16 L → ≈ 1/4.
+- Sem registro, ou se o último abastecimento foi parcial e sem o nível, mostra
+  "Dados insuficientes" e o motivo (nunca um nível inventado).
 
 ### 15.4 Como o consumo é calculado
 
@@ -1145,6 +1191,8 @@ Esta parte não tem migration nova: usa as tabelas e views que já existem
 - **Precisa de atenção**: manutenções atrasadas ou próximas, problemas em
   aberto, contas vencidas (ou que vencem hoje), tamanho do tanque que falta
   no cadastro e a marcação do km e do nível do mês (seção 15.3).
+- **Nível do tanque**: o último nível registrado e, se o carro rodou depois, a estimativa de agora (seção 15.3).
+- **Próximos gastos**: total e os três gastos futuros mais próximos (seção 14.3).
 - **Gastos do mês**: o mesmo total da aba Finanças no mês atual (fuso de
   Brasília), em três grupos fixos como no PDF: Manutenção, Combustível e
   Outros (gastos avulsos + projetos). As categorias completas ficam em Finanças.
@@ -1488,3 +1536,83 @@ com a versão final (build + preview):
 | HTTPS com certificado próprio | não configurado | seção 18.7 |
 | iPhone/Safari | fora do aparelho escolhido (Android + Chrome) | compatibilidade não validada |
 | Uso fora de casa | exigiria hospedagem com HTTPS, fora do escopo | — |
+
+## 20. Dados de exemplo para apresentação
+
+Para apresentar o sistema (TCC) sem mostrar nem misturar os seus dados reais,
+existe uma carga **opcional** de dados de exemplo. Ela grava só num banco
+próprio, `meu_veiculo_demo` (`DB_NOME_DEMO`), e nunca no de desenvolvimento
+(há uma trava: o nome precisa terminar em `_demo`). As migrations não criam
+dados de exemplo, e o sistema continua funcionando com banco vazio.
+
+### 20.1 O que é criado
+
+- **Paula Demonstração** (`paula@exemplo.com.br`, administradora): um Honda
+  Civic com uns 8 meses de histórico, terminando nesta semana: abastecimentos
+  de gasolina e etanol (com troca de combustível e nível do marcador), planos de
+  manutenção (um próximo do limite), manutenções com peças e mão de obra e uma
+  agendada, um problema resolvido por manutenção, um em aberto e um descartado,
+  gastos pagos, uma conta vencida e uma a vencer, projetos (concluído, acima do
+  orçamento e planejado) e fotos (capa, nota fiscal, problema, antes e depois);
+  e uma moto com alguns abastecimentos.
+- **Rafael Demonstração** (`rafael@exemplo.com.br`, perfil padrão): um Fiat
+  Argo, para a tela de Administração ter mais de uma conta.
+- Senha das duas contas: `meu veiculo de exemplo`. Não é segredo: está no
+  arquivo `backend\demonstracao\carga_exemplo.py` e serve só para a demonstração.
+
+As datas são calculadas a partir do dia em que você carrega: o Início mostra
+gastos do mês, alertas e indicadores de verdade. Os dados entram pela própria
+API, com as mesmas regras das telas.
+
+### 20.2 Preparar (uma vez só)
+
+Pasta `meu-veiculo\backend`:
+
+1. Criar o banco de demonstração. O comando pede a senha do `postgres` e não
+   apaga nada nos bancos que já existem:
+
+   ```powershell
+   .\.venv\Scripts\python.exe gerenciar.py criar-bancos
+   ```
+
+   Esperado: `Banco 'meu_veiculo_demo' criado.` (os outros: "já existia: nada foi apagado").
+2. Carregar os dados (aplica as migrations no banco de demonstração e grava os exemplos):
+
+   ```powershell
+   .\.venv\Scripts\python.exe gerenciar.py carregar-exemplo
+   ```
+
+   Esperado: `Dados de exemplo gravados no banco 'meu_veiculo_demo': 3 veículos, ... e 5 fotos.`
+
+O comando usa bibliotecas de desenvolvimento (`requirements-dev.txt`), que
+você já instalou na seção 4.2.
+
+### 20.3 Abrir o sistema com os dados de exemplo
+
+**Terminal 1, backend** (pasta `meu-veiculo\backend`), num terminal **novo**:
+
+```powershell
+$env:DB_NOME = "meu_veiculo_demo"
+.\.venv\Scripts\python.exe -m uvicorn app.main:app
+```
+
+**Terminal 2, frontend** (pasta `meu-veiculo\frontend`): `npm run dev` ou
+`npm run app:celular` (seção 18), como sempre. Entre com uma das contas de 20.1.
+
+`$env:DB_NOME` vale **só para aquele terminal**: enquanto ele estiver aberto,
+o backend usa o banco de demonstração. Para voltar aos seus dados, pare o
+backend (`Ctrl + C`), **feche esse terminal** e inicie o backend num terminal
+novo, sem a primeira linha. Não rode `gerenciar.py migrar` ou `backup` nesse
+terminal pensando que é o banco de verdade.
+
+### 20.4 Atualizar as datas antes da apresentação
+
+Para começar de novo, com o histórico terminando no dia de hoje (apaga **só**
+o banco de demonstração; pare o backend de demonstração antes):
+
+```powershell
+.\.venv\Scripts\python.exe gerenciar.py carregar-exemplo --recomecar
+```
+
+Sem `--recomecar`, o comando se recusa a carregar num banco de demonstração que
+já tem contas.

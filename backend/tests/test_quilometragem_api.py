@@ -24,10 +24,19 @@ def leituras(cliente, veiculo_id: int, **parametros) -> dict:
     return resposta.json()
 
 
-def registrar(cliente, veiculo_id: int, km, data=None):
+@pytest.fixture
+def eletrico(paula) -> dict:
+    """Único tipo sem tanque: o "Atualizar km" dele continua sendo uma leitura manual."""
+    return criar_veiculo(paula, placa="ELE7R01", tipo_combustivel="eletrico", capacidade_tanque=None)
+
+
+def registrar(cliente, veiculo_id: int, km, data=None, nivel: int | None = 4):
+    """Como a tela "Atualizar km": com o nível do combustível (oitavos), menos no elétrico."""
     corpo = {"quilometragem": km}
     if data is not None:
         corpo["data_leitura"] = str(data)
+    if nivel is not None:
+        corpo["nivel"] = nivel
     return cliente.post(f"/api/veiculos/{veiculo_id}/leituras", json=corpo)
 
 
@@ -110,7 +119,57 @@ def test_leitura_que_contradiz_o_historico_e_recusada(banco, paula, hoje):
 def test_envio_repetido_nao_duplica_a_leitura(paula, civic):
     assert registrar(paula, civic["id"], 85450).status_code == 201
     assert registrar(paula, civic["id"], 85450).status_code == 201
-    assert leituras(paula, civic["id"])["total"] == 2  # cadastro + uma manual
+    assert leituras(paula, civic["id"])["total"] == 2  # cadastro + uma (da marcação)
+    assert len(paula.get(f"/api/veiculos/{civic['id']}/tanque/marcacoes").json()["itens"]) == 1
+
+
+# ---------------------------------------------- nível do combustível (regra da Paula)
+
+def test_atualizar_km_exige_o_nivel_do_combustivel(paula, civic):
+    resposta = registrar(paula, civic["id"], 85450, nivel=None)
+    assert resposta.status_code == 422
+    assert "Informe o nível do combustível" in resposta.json()["campos"]["nivel"]
+    for invalido in (-1, 9):
+        resposta = registrar(paula, civic["id"], 85450, nivel=invalido)
+        assert resposta.status_code == 422 and "Nível inválido" in resposta.json()["campos"]["nivel"]
+    assert leituras(paula, civic["id"])["total"] == 1  # nada gravado
+
+
+def test_km_com_nivel_vira_marcacao_do_tanque_e_entra_no_consumo(paula, civic, hoje):
+    corpo = registrar(paula, civic["id"], 85450, nivel=3).json()
+    assert corpo["quilometragem"] == 85450 and corpo["data_leitura_km"] == str(hoje)
+    [marcacao] = paula.get(f"/api/veiculos/{civic['id']}/tanque/marcacoes").json()["itens"]
+    assert (marcacao["quilometragem"], marcacao["nivel"], marcacao["data"]) == (85450, 3, str(hoje))
+    leitura = leituras(paula, civic["id"])["itens"][0]
+    assert (leitura["origem"], leitura["origem_id"]) == ("medicao_tanque", marcacao["id"])
+    # Corrige-se editando a marcação, como as leituras de abastecimento.
+    assert leitura["editavel"] is False
+    resposta = paula.post(f"/api/veiculos/{civic['id']}/leituras/{leitura['id']}/corrigir",
+                          json={"quilometragem": 85400})
+    assert resposta.status_code == 409 and "marcação do tanque" in resposta.json()["mensagem"]
+
+
+def test_eletrico_atualiza_km_sem_nivel(paula, eletrico, hoje):
+    corpo = registrar(paula, eletrico["id"], 85500, nivel=None).json()
+    assert corpo["quilometragem"] == 85500 and corpo["data_leitura_km"] == str(hoje)
+    assert leituras(paula, eletrico["id"])["itens"][0]["origem"] == "manual"
+    resposta = registrar(paula, eletrico["id"], 90000, nivel=4)
+    assert resposta.status_code == 422
+    assert "não tem tanque" in resposta.json()["campos"]["nivel"]
+
+
+def test_sem_o_tamanho_do_tanque_pede_para_completar_o_cadastro(banco, paula, civic):
+    executar_sql(banco, "UPDATE veiculo SET capacidade_tanque = NULL")
+    resposta = registrar(paula, civic["id"], 85450)
+    assert resposta.status_code == 409
+    assert "tamanho do tanque" in resposta.json()["mensagem"]
+
+
+def test_veiculo_inativo_nao_atualiza_km_mesmo_sem_nivel(paula, civic):
+    paula.post(f"/api/veiculos/{civic['id']}/inativar")
+    for nivel in (None, 4):
+        resposta = registrar(paula, civic["id"], 85450, nivel=nivel)
+        assert resposta.status_code == 409 and "inativo" in resposta.json()["mensagem"]
 
 
 # ---------------------------------------------------------------- permissões
@@ -152,8 +211,9 @@ def test_admin_tambem_respeita_o_veiculo_da_leitura(paula, admin, civic):
 
 # ------------------------------------------------------------------ correção
 
-def test_corrigir_leitura_errada_preserva_o_historico_e_recalcula(banco, paula, civic, hoje):
-    registrar(paula, civic["id"], 854500)  # um zero a mais
+def test_corrigir_leitura_errada_preserva_o_historico_e_recalcula(banco, paula, eletrico, hoje):
+    civic = eletrico  # leitura manual (sem tanque); as com nível se corrigem na marcação
+    registrar(paula, civic["id"], 854500, nivel=None)  # um zero a mais
     assert paula.get(f"/api/veiculos/{civic['id']}").json()["quilometragem"] == 854500
     errada = leituras(paula, civic["id"])["itens"][0]
 
@@ -208,8 +268,9 @@ def test_correcao_tambem_precisa_combinar_com_o_historico(banco, paula, hoje):
     assert igual.status_code == 422 and "igual" in igual.json()["mensagem"]
 
 
-def test_anular_leitura_recalcula_e_nao_deixa_o_veiculo_sem_leitura(paula, civic):
-    registrar(paula, civic["id"], 99000)
+def test_anular_leitura_recalcula_e_nao_deixa_o_veiculo_sem_leitura(paula, eletrico):
+    civic = eletrico  # leitura manual (sem tanque)
+    registrar(paula, civic["id"], 99000, nivel=None)
     itens = leituras(paula, civic["id"])["itens"]
     errada = [i for i in itens if i["quilometragem"] == 99000][0]
     cadastro = [i for i in itens if i["origem"] == "cadastro"][0]

@@ -10,6 +10,9 @@ cheio, e o mês fecha certinho no "Consumo por mês".
 - A quilometragem vira leitura do hodômetro (trigger da 0012) e precisa
   combinar com as outras leituras, como no abastecimento.
 - Nível em oitavos do tanque (services/tanque.py).
+- Regra da Paula (02/10/2026): em veículo com tanque, todo "Atualizar km"
+  pede o nível e vira uma marcação (registrar_km), para o consumo ter mais
+  pontos. Só o elétrico atualiza o km sem nível.
 """
 
 from dataclasses import dataclass
@@ -114,6 +117,21 @@ class MedicaoTanqueService:
             self._veiculos.recarregar(veiculo)  # a quilometragem pode ter mudado
             _, situacoes = self._situacoes(veiculo)
         return MedicaoDetalhe(m, situacoes[m.id])
+
+    def registrar_km(self, usuario: Usuario, veiculo_id: int, quilometragem: int, data: date,
+                     nivel: int | None) -> Veiculo:
+        """"Atualizar km" de veículo com tanque: a leitura do hodômetro entra como marcação
+        (km + nível), que também é um ponto do consumo. Envio repetido não duplica."""
+        with self._uow.transacao():
+            veiculo = self._acesso.exigir_para_alterar(usuario, veiculo_id, bloquear=True)
+            dados = self._validar(veiculo, {"data": data, "quilometragem": quilometragem,
+                                            "nivel": nivel}, None)
+            repetida = any((m.data, m.quilometragem, m.nivel) == (data, dados["quilometragem"], dados["nivel"])
+                           for m in self._medicoes.todas(veiculo.id))
+            if not repetida:
+                self._medicoes.criar(veiculo.id, dados)
+            self._veiculos.recarregar(veiculo)  # a quilometragem pode ter mudado
+        return veiculo
 
     def editar(self, usuario: Usuario, veiculo_id: int, medicao_id: int, dados: dict) -> MedicaoDetalhe:
         with self._uow.transacao():

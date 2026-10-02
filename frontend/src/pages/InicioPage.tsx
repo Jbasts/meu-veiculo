@@ -13,6 +13,7 @@ import {
   IconeSetaBaixo,
 } from "../components/Icones";
 import { BarraEmPartes, periodoCurtoDoCustoPorKm } from "../components/PecasCusto";
+import { NivelDoTanqueCartao } from "../components/PecasTanque";
 import { TOM_DA_GRAVIDADE } from "../components/PecasDiagnostico";
 import { destinoDaPendencia, IconeDaSituacao, TOM_DA_SITUACAO } from "../components/PecasManutencao";
 import { Hodometro, Placa } from "../components/PecasVeiculo";
@@ -23,6 +24,7 @@ import { listarPendentes } from "../services/manutencaoService";
 import { obterPainel } from "../services/painelService";
 import { ROTULO_COMBUSTIVEL, unidade, type Combustivel } from "../types/abastecimento";
 import { rotuloGravidade, type DiagnosticoResumo } from "../types/diagnostico";
+import { rotuloCategoria } from "../types/gasto";
 import { resumoDoPrazo, type Pendencia } from "../types/manutencao";
 import type { AvisosDoTanque, ContasEmAtraso, PainelInicio } from "../types/painel";
 import { formatarDataIso, nomeDoMes } from "../utils/datas";
@@ -260,6 +262,55 @@ function GastosDoMesCartao({ painel }: { painel: PainelInicio }) {
   );
 }
 
+function emQuantosDias(dias: number): string {
+  if (dias === 0) return "hoje";
+  if (dias === 1) return "amanhã";
+  return `em ${dias} dias`;
+}
+
+/** "Próximos gastos": contas lançadas para pagar depois (ex.: IPVA do ano que vem). */
+function GastosFuturosCartao({ veiculoId, painel }: { veiculoId: number; painel: PainelInicio }) {
+  const futuros = painel.gastos_futuros;
+  return (
+    <section className="cartao custo" aria-label="Próximos gastos">
+      <div className="custo__topo">
+        <span className="texto-suave">Próximos gastos</span>
+        <Link to="/financas" className="link">Ver todos</Link>
+      </div>
+      {futuros.quantidade === 0 ? (
+        <>
+          <p className="texto-suave">Nenhum gasto futuro lançado.</p>
+          <Link to={`/veiculos/${veiculoId}/gastos/novo?futuro=1`} className="link">
+            Lançar gasto futuro
+          </Link>
+        </>
+      ) : (
+        <>
+          <p className="custo__valor">{formatarDinheiro(futuros.total)}</p>
+          <p className="texto-suave">
+            {futuros.quantidade === 1 ? "1 gasto previsto" : `${futuros.quantidade} gastos previstos`}
+          </p>
+          <ul className="lista-simples proximos-gastos">
+            {futuros.proximos.map((g) => (
+              <li key={g.id}>
+                <Link to={`/veiculos/${veiculoId}/gastos/${g.id}`} className="lista-simples__item">
+                  <span className="lista-simples__texto">
+                    <span className="lista-simples__titulo">{g.descricao ?? rotuloCategoria(g.categoria)}</span>
+                    <span className="texto-suave">
+                      {formatarDataIso(g.data_vencimento)} · {emQuantosDias(g.dias)}
+                    </span>
+                  </span>
+                  <strong>{formatarDinheiro(g.valor)}</strong>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
+  );
+}
+
 /** Consumo médio e custo por km. Sem base, mostra "Dados insuficientes" e o motivo (nunca zero). */
 function Indicadores({ veiculoId, painel }: { veiculoId: number; painel: PainelInicio }) {
   const { consumo, custo_por_km: km } = painel;
@@ -314,7 +365,7 @@ function Indicadores({ veiculoId, painel }: { veiculoId: number; painel: PainelI
 }
 
 /** Alertas e indicadores do veículo em uso (os números vêm do backend num pedido só). */
-function PainelDoVeiculo({ veiculoId }: { veiculoId: number }) {
+function PainelDoVeiculo({ veiculoId, temTanque }: { veiculoId: number; temTanque: boolean }) {
   const [painel, setPainel] = useState<PainelInicio | null>(null);
   const [falhou, setFalhou] = useState(false);
 
@@ -338,7 +389,9 @@ function PainelDoVeiculo({ veiculoId }: { veiculoId: number }) {
       {falhou && <p className="texto-suave">Não foi possível carregar os gastos e os indicadores.</p>}
       {painel && (
         <>
+          {temTanque && <NivelDoTanqueCartao veiculoId={veiculoId} nivel={painel.nivel_tanque} />}
           <GastosDoMesCartao painel={painel} />
+          <GastosFuturosCartao veiculoId={veiculoId} painel={painel} />
           <Indicadores veiculoId={veiculoId} painel={painel} />
         </>
       )}
@@ -347,7 +400,7 @@ function PainelDoVeiculo({ veiculoId }: { veiculoId: number }) {
 }
 
 // Tela inicial (PDF, página 2): veículo em uso, quilometragem, atalhos,
-// "Precisa de atenção", gastos do mês, consumo médio e custo por km.
+// "Precisa de atenção", gastos do mês, próximos gastos, consumo médio e custo por km.
 export default function InicioPage() {
   const { usuario } = useAuth();
   const { carregando, erro, veiculos, emUso, recarregar } = useVeiculos();
@@ -419,7 +472,7 @@ export default function InicioPage() {
 
       <Atalhos veiculoId={emUso.id} />
 
-      <PainelDoVeiculo key={emUso.id} veiculoId={emUso.id} />
+      <PainelDoVeiculo key={emUso.id} veiculoId={emUso.id} temTanque={emUso.tipo_combustivel !== "eletrico"} />
 
       <Link to={`/veiculos/${emUso.id}`} className="botao botao--secundario">
         Ver dados, fotos e custo total do veículo

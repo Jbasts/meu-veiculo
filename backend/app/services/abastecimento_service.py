@@ -68,6 +68,7 @@ from app.services.acesso_veiculo import AcessoVeiculo
 from app.services.calendario import data_br, numero_br
 from app.services.consumo import Media, MesDeConsumo, Resultado, Situacao, calcular_tudo, medias, por_mes
 from app.services.erros import DadosInvalidos, NaoEncontrado
+from app.services.nivel_tanque import NivelDoTanque, nivel_do_tanque
 from app.services.paginacao import Pagina, limite_e_deslocamento
 from app.services.tanque import combustivel_inicial, conferir_se_cabe, tanque_pendente, validar_nivel
 from app.services.veiculo_service import validar_quilometragem
@@ -145,6 +146,7 @@ class ResumoCombustivel:
     tanque_pendente: bool           # tem tanque, mas falta o tamanho no cadastro
     marcacao_do_mes_pendente: bool  # ainda não marcou o km e o nível neste mês
     meses: list[MesDeConsumo]       # do mais recente para o mais antigo (até 12)
+    nivel_tanque: NivelDoTanque     # último nível conhecido e estimativa de agora
 
 
 MESES_NO_RESUMO = 12
@@ -317,6 +319,7 @@ class AbastecimentoService:
                 veiculo.ativo and veiculo.capacidade_tanque is not None
                 and not self._medicoes.existe_desde(veiculo.id, self._hoje().replace(day=1))),
             meses=por_mes(ciclos)[:MESES_NO_RESUMO],
+            nivel_tanque=nivel_do_tanque(veiculo, todos, self._medicoes.todas(veiculo.id), por_combustivel),
         )
 
     @staticmethod

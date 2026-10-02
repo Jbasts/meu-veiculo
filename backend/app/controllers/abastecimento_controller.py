@@ -13,6 +13,7 @@ from app.schemas.abastecimento_schema import (
     ComparacaoResposta,
     MediaResposta,
     MesResposta,
+    NivelTanqueResposta,
     PaginaAbastecimentos,
     ResumoCombustivelResposta,
     SituacaoResposta,
@@ -72,4 +73,5 @@ class AbastecimentoController:
             capacidade_tanque=r.capacidade_tanque, tanque_pendente=r.tanque_pendente,
             marcacao_do_mes_pendente=r.marcacao_do_mes_pendente,
             meses=[MesResposta(ano=mes.ano, mes=mes.mes, **media_resposta(mes.media)) for mes in r.meses],
+            nivel_tanque=NivelTanqueResposta(**asdict(r.nivel_tanque)),
         )

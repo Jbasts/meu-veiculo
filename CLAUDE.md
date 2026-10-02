@@ -47,7 +47,7 @@ meu-veiculo/
 ├── CLAUDE.md
 ├── README.md                 # guia completo, atualizado a cada etapa
 ├── backend/
-│   ├── gerenciar.py          # comandos (criar-bancos, estado, migrar, adotar, backup, promover-admin, importar-fotos)
+│   ├── gerenciar.py          # comandos (criar-bancos, estado, migrar, adotar, backup, promover-admin, importar-fotos, carregar-exemplo)
 │   ├── migrations/versions/  # Alembic; 0001 = SQL original (conferido por SHA-256)
 │   ├── tests/                # pytest no PostgreSQL de teste
 │   └── app/
@@ -81,6 +81,7 @@ PowerShell. No PowerShell, o `npm` exige `Set-ExecutionPolicy -Scope CurrentUser
 - Primeiro administrador (pasta `backend`, conta já criada pela tela): `.\.venv\Scripts\python.exe gerenciar.py promover-admin EMAIL`
 - E-mails de desenvolvimento (modo arquivo): arquivos `.eml` em `backend\emails_dev\` (fora do Git)
 - Fotos: imagens no PostgreSQL (tabela `foto_conteudo`, migration 0013); nada é gravado em pasta. Copiar para o banco fotos que ainda estejam na antiga pasta `backend\storage\` (pasta `backend`): `.\.venv\Scripts\python.exe gerenciar.py importar-fotos`
+- Dados de exemplo (opcional, só no banco `meu_veiculo_demo`; pasta `backend`): `.\.venv\Scripts\python.exe gerenciar.py carregar-exemplo` (`--recomecar` para refazer). Abrir com eles: `$env:DB_NOME = "meu_veiculo_demo"` antes do uvicorn, num terminal próprio (README seção 20)
 - Iniciar backend (pasta `backend`): `.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload` → http://127.0.0.1:8000/docs
 - Preparar frontend (pasta `frontend`): `npm ci`
 - Iniciar frontend (pasta `frontend`): `npm run dev` → http://localhost:5173

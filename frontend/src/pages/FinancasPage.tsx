@@ -35,7 +35,7 @@ import {
 } from "../types/gasto";
 import type { Veiculo } from "../types/veiculo";
 import { formatarDataIso, hojeIso, mesDaData, nomeDoMes, somarMeses } from "../utils/datas";
-import { formatarDinheiro, formatarInteiro } from "../utils/formatos";
+import { formatarDinheiro, formatarInteiro, somarDinheiro } from "../utils/formatos";
 
 type Aba = "gastos" | "combustivel";
 type TipoPeriodo = Periodo["tipo"];
@@ -234,14 +234,17 @@ function Contas({ veiculo, versao, aoMudar }: { veiculo: Veiculo; versao: number
   if (erro) return <ErroComNovaTentativa mensagem={erro} aoTentar={() => void carregar()} />;
   if (pendentes === null) return null;
   const vencidas = pendentes.filter((p) => p.situacao === "vencido");
-  const aVencer = pendentes.filter((p) => p.situacao !== "vencido");
+  const futuros = pendentes.filter((p) => p.situacao !== "vencido");
   return (
     <>
       {aviso && <Alerta tipo="sucesso">{aviso}</Alerta>}
-      {[{ titulo: "Vencidas", itens: vencidas }, { titulo: "A vencer", itens: aVencer }].map(({ titulo, itens }) =>
+      {[{ titulo: "Vencidas", itens: vencidas }, { titulo: "Gastos futuros", itens: futuros }].map(({ titulo, itens }) =>
         itens.length > 0 && (
           <section key={titulo} aria-label={titulo}>
-            <h2 className="rotulo-secao">{titulo}</h2>
+            <h2 className="rotulo-secao rotulo-secao--com-total">
+              <span>{titulo}</span>
+              <span>{formatarDinheiro(somarDinheiro(itens.map((p) => p.valor)))}</span>
+            </h2>
             <ul className="cartao lista-simples">
               {itens.map((p) => (
                 <ItemPendente key={p.id} veiculo={veiculo} pendente={p} aoPagar={(escolhido) => {
@@ -254,6 +257,11 @@ function Contas({ veiculo, versao, aoMudar }: { veiculo: Veiculo; versao: number
             </ul>
           </section>
         ))}
+      {veiculo.ativo && (
+        <Link to={`/veiculos/${veiculo.id}/gastos/novo?futuro=1`} className="botao botao--secundario">
+          Lançar gasto futuro
+        </Link>
+      )}
       {total > pendentes.length && (
         <p className="texto-suave">Mostrando as {pendentes.length} contas com vencimento mais próximo de {total}.</p>
       )}

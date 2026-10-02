@@ -44,7 +44,7 @@ def por_km(valor: str, distancia: int) -> str:
 
 def registrar_leitura(cliente, veiculo_id: int, km: int, data) -> None:
     resposta = cliente.post(f"/api/veiculos/{veiculo_id}/leituras",
-                            json={"quilometragem": km, "data_leitura": str(data)})
+                            json={"quilometragem": km, "data_leitura": str(data), "nivel": 4})
     assert resposta.status_code == 201, resposta.text
 
 
@@ -202,6 +202,7 @@ def test_painel_de_veiculo_sem_registros(paula, civic, hoje):
     assert dados["consumo"]["valor"] is None
     assert dados["consumo"]["motivo"] == "Nenhum abastecimento registrado ainda."
     assert dados["contas"] == {"vencidas": 0, "total_vencidas": "0.00", "vencem_hoje": 0}
+    assert dados["gastos_futuros"] == {"quantidade": 0, "total": "0.00", "proximos": []}
     assert dados["custo_por_km"]["disponivel"] is True      # compra informada: 0,00 de 63.000 km
     assert dados["custo_por_km"]["valor"] == "0.00"
 
@@ -263,6 +264,46 @@ def test_painel_contas_vencidas_e_que_vencem_hoje(paula, civic, hoje):
     criar_gasto(paula, v, str(hoje), categoria="lavagem", valor="40.00",
                 data_vencimento=str(hoje + timedelta(days=5)), **pendente)
     assert painel(paula, v)["contas"] == {"vencidas": 2, "total_vencidas": "1288.38", "vencem_hoje": 1}
+
+
+def test_painel_gastos_futuros_os_tres_mais_proximos_e_o_total(paula, civic, hoje):
+    """Ex. da Paula: IPVA 2027 de R$ 1.645,00 lançado agora para 13/05/2027."""
+    v = civic["id"]
+    pendente = {"pago": False, "data_pagamento": None}
+    ipva = criar_gasto(paula, v, str(hoje), categoria="ipva", valor="1645.00",
+                       descricao="IPVA 2027", data_vencimento=str(hoje + timedelta(days=300)),
+                       **pendente)
+    criar_gasto(paula, v, str(hoje), categoria="seguro", valor="2400.00",
+                data_vencimento=str(hoje + timedelta(days=40)), **pendente)
+    criar_gasto(paula, v, str(hoje), categoria="lavagem", valor="40.00",
+                data_vencimento=str(hoje), **pendente)                            # vence hoje: conta
+    criar_gasto(paula, v, str(hoje), categoria="licenciamento", valor="160.22",
+                data_vencimento=str(hoje + timedelta(days=320)), **pendente)      # 4º: só no total
+    criar_gasto(paula, v, str(hoje - timedelta(days=9)), categoria="multa", valor="88.38",
+                data_vencimento=str(hoje - timedelta(days=1)), **pendente)        # vencida: não
+    criar_gasto(paula, v, str(hoje), categoria="estacionamento", valor="30.00")   # pago: não
+
+    dados = painel(paula, v)
+    futuros = dados["gastos_futuros"]
+    assert (futuros["quantidade"], futuros["total"]) == (4, "4245.22")  # 1645 + 2400 + 40 + 160,22
+    assert [(g["categoria"], g["dias"]) for g in futuros["proximos"]] == [
+        ("lavagem", 0), ("seguro", 40), ("ipva", 300)]
+    assert futuros["proximos"][2] == {
+        "id": ipva["id"], "categoria": "ipva", "descricao": "IPVA 2027", "valor": "1645.00",
+        "data_vencimento": str(hoje + timedelta(days=300)), "dias": 300}
+    # Gasto futuro não entra nos gastos do mês (só o estacionamento pago).
+    assert dados["gastos_do_mes"]["total"] == "30.00"
+    # Depois de pago, sai dos futuros.
+    paula.post(f"/api/veiculos/{v}/gastos/{ipva['id']}/pagar", json={"data_pagamento": str(hoje)})
+    assert painel(paula, v)["gastos_futuros"]["quantidade"] == 3
+
+
+def test_gastos_futuros_sao_so_do_veiculo(paula, civic, hoje):
+    outro = criar_veiculo(paula, placa="XYZ9A87")
+    criar_gasto(paula, outro["id"], str(hoje), categoria="ipva", valor="900.00", pago=False,
+                data_pagamento=None, data_vencimento=str(hoje + timedelta(days=30)))
+    assert painel(paula, civic["id"])["gastos_futuros"]["quantidade"] == 0
+    assert painel(paula, outro["id"])["gastos_futuros"]["quantidade"] == 1
 
 
 # ================================================================ permissões

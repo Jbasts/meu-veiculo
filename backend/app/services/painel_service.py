@@ -24,6 +24,8 @@ Custo por km
 
 Contas em atraso
 - Gastos pendentes vencidos (e os que vencem hoje), para "Precisa de atenção".
+- Gastos futuros (pendentes que vencem hoje ou depois): quantidade, total e os
+  três mais próximos, para o cartão "Próximos gastos".
 """
 
 from dataclasses import dataclass
@@ -48,6 +50,7 @@ from app.services.custo_service import (
     somar_por_grupo,
 )
 from app.services.gasto_service import intervalo_do_mes, percentual
+from app.services.nivel_tanque import NivelDoTanque, nivel_do_tanque
 from app.services.tanque import tanque_pendente
 
 GRUPOS_DO_MES = (MANUTENCAO, COMBUSTIVEL, OUTROS)
@@ -82,6 +85,9 @@ class ConsumoMedio:
     maximo: Decimal | None = None
 
 
+# Quantos gastos futuros o Início mostra (o resto fica em Finanças).
+PROXIMOS_GASTOS = 3
+
 @dataclass(frozen=True)
 class AvisosDoTanque:
     tamanho_pendente: bool         # tem tanque, mas falta o tamanho no cadastro
@@ -96,12 +102,34 @@ class ContasEmAtraso:
 
 
 @dataclass(frozen=True)
+class ProximoGasto:
+    id: int
+    categoria: str
+    descricao: str | None
+    valor: Decimal
+    data_vencimento: date
+    dias: int                      # dias até a data prevista (0 = hoje)
+
+
+@dataclass(frozen=True)
+class GastosFuturos:
+    """Gastos lançados para pagar depois (pendentes que vencem hoje ou depois).
+
+    Não entram nos gastos do mês: só contam quando forem pagos."""
+    quantidade: int
+    total: Decimal
+    proximos: list[ProximoGasto]   # os PROXIMOS_GASTOS mais próximos
+
+
+@dataclass(frozen=True)
 class PainelInicio:
     gastos_do_mes: GastosDoMes
     consumo: ConsumoMedio
     custo_por_km: CustoPorKm
     contas: ContasEmAtraso
     tanque: AvisosDoTanque
+    gastos_futuros: GastosFuturos
+    nivel_tanque: NivelDoTanque
 
 
 def consumo_medio(veiculo: Veiculo, abastecimentos, medicoes) -> ConsumoMedio:
@@ -150,18 +178,27 @@ class PainelService:
         somas = somar_por_grupo(linhas, grupo_do_mes)
         total = sum(somas.values(), ZERO)
         vencidas, total_vencidas, vencem_hoje = self._gastos.contas_em_atraso(veiculo.id, hoje)
+        quantidade_futuros, total_futuros, proximos = self._gastos.futuros(veiculo.id, hoje,
+                                                                           PROXIMOS_GASTOS)
+        abastecimentos = self._abastecimentos.todos(veiculo.id)
+        medicoes = self._medicoes.todas(veiculo.id)
         return PainelInicio(
             gastos_do_mes=GastosDoMes(
                 ano=hoje.year, mes=hoje.month, total=total, quantidade=sum(q for _, _, q in linhas),
                 parcelas=[Parcela(g, somas[g], percentual(somas[g], total))
                           for g in GRUPOS_DO_MES if somas.get(g, ZERO) > 0],
             ),
-            consumo=consumo_medio(veiculo, self._abastecimentos.todos(veiculo.id),
-                                  self._medicoes.todas(veiculo.id)),
+            consumo=consumo_medio(veiculo, abastecimentos, medicoes),
             custo_por_km=self._custo.calcular_por_km(veiculo),
             contas=ContasEmAtraso(vencidas, total_vencidas, vencem_hoje),
             tanque=AvisosDoTanque(
                 tamanho_pendente=veiculo.ativo and tanque_pendente(veiculo),
                 marcacao_do_mes_pendente=(veiculo.ativo and veiculo.capacidade_tanque is not None
                                           and not self._medicoes.existe_desde(veiculo.id, inicio))),
+            gastos_futuros=GastosFuturos(quantidade_futuros, total_futuros, [
+                ProximoGasto(g.id, g.categoria, g.descricao, g.valor, g.data_vencimento,
+                             (g.data_vencimento - hoje).days) for g in proximos]),
+            nivel_tanque=nivel_do_tanque(
+                veiculo, abastecimentos, medicoes,
+                medias(calcular_do_veiculo(veiculo, abastecimentos, medicoes).ciclos)),
         )

@@ -1,3 +1,4 @@
+import type { NivelTanque } from "./abastecimento";
 // Formatos de backend/app/schemas/painel_schema.py (tela inicial e custo do veículo).
 // Dinheiro vem como texto ("0.76"). Indicador sem dados vem com disponivel=false e o motivo.
 
@@ -102,10 +103,30 @@ export interface ContasEmAtraso {
   vencem_hoje: number;
 }
 
+export interface ProximoGasto {
+  id: number;
+  categoria: string;
+  descricao: string | null;
+  valor: string;
+  data_vencimento: string;
+  /** Dias até a data prevista (0 = hoje). */
+  dias: number;
+}
+
+/** Gastos lançados para pagar depois (pendentes que vencem hoje ou depois). */
+export interface GastosFuturos {
+  quantidade: number;
+  total: string;
+  /** Os três mais próximos. */
+  proximos: ProximoGasto[];
+}
+
 export interface PainelInicio {
   gastos_do_mes: GastosDoMes;
   consumo: ConsumoMedio;
   custo_por_km: CustoPorKm;
   contas: ContasEmAtraso;
   tanque: AvisosDoTanque;
+  gastos_futuros: GastosFuturos;
+  nivel_tanque: NivelTanque;
 }

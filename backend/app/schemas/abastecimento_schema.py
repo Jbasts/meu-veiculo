@@ -108,6 +108,19 @@ class ComparacaoResposta(BaseModel):
     precos_simulados: bool
 
 
+class NivelTanqueResposta(BaseModel):
+    """Último nível conhecido do tanque e a estimativa de agora (services/nivel_tanque.py)."""
+    disponivel: bool
+    motivo: str | None
+    nivel: int | None               # oitavos (0 = vazio, 8 = cheio)
+    data: date | None
+    quilometragem: int | None
+    origem: str | None              # marcacao | abastecimento
+    km_desde: int | None            # km rodados desde o registro
+    nivel_estimado: int | None      # oitavos, estimativa de agora pelo consumo médio
+    km_por_litro: Decimal | None    # consumo médio usado na estimativa
+
+
 class ResumoCombustivelResposta(BaseModel):
     combustiveis: list[str]         # os que o veículo aceita
     medias: list[MediaResposta]     # só combustíveis com pelo menos um ciclo válido
@@ -118,6 +131,7 @@ class ResumoCombustivelResposta(BaseModel):
     tanque_pendente: bool               # tem tanque, mas falta o tamanho no cadastro
     marcacao_do_mes_pendente: bool      # ainda não marcou o km e o nível neste mês
     meses: list[MesResposta]            # consumo por mês, do mais recente (até 12)
+    nivel_tanque: NivelTanqueResposta
 
 
 # ------------------------------------------------------------- marcação do tanque

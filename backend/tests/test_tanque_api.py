@@ -264,3 +264,70 @@ def test_admin_ve_e_veiculo_inativo_e_so_leitura(paula, admin, civic, hoje):
 def test_quantidade_decimal_nao_vira_float(paula, civic, hoje):
     criado = abastecer(paula, civic["id"], hoje, 85100, litros=None, preco="5.999", valor_total="99.99")
     assert Decimal(criado["litros"]) == Decimal("16.668")  # 99,99 ÷ 5,999 = 16,6677...
+
+
+# ------------------------------------------------- nível do tanque (Início e Combustível)
+
+def nivel(cliente, veiculo_id: int) -> dict:
+    """O mesmo bloco vem no painel do Início e no resumo do combustível."""
+    no_painel = painel(cliente, veiculo_id)["nivel_tanque"]
+    assert resumo(cliente, veiculo_id)["nivel_tanque"] == no_painel
+    return no_painel
+
+
+def test_sem_registro_o_nivel_e_desconhecido_nunca_zero(paula, civic):
+    dados_nivel = nivel(paula, civic["id"])
+    assert dados_nivel["disponivel"] is False and dados_nivel["nivel"] is None
+    assert "Ainda não há nível registrado" in dados_nivel["motivo"]
+
+
+def test_tanque_cheio_e_o_nivel_e_sem_consumo_nao_estima(paula, civic, hoje):
+    abastecer(paula, civic["id"], hoje - timedelta(days=1), 84600)
+    dados_nivel = nivel(paula, civic["id"])
+    assert (dados_nivel["nivel"], dados_nivel["origem"], dados_nivel["quilometragem"]) == (8, "abastecimento", 84600)
+    assert dados_nivel["km_desde"] == 400            # 85.000 atuais - 84.600
+    assert dados_nivel["nivel_estimado"] is None     # ainda sem consumo médio
+
+
+def test_estimativa_de_agora_pelo_consumo_medio(paula, civic, hoje):
+    abastecer(paula, civic["id"], hoje - timedelta(days=2), 84000)
+    abastecer(paula, civic["id"], hoje - timedelta(days=1), 84500)   # 500 km / 40 L = 12,5 km/L
+    dados_nivel = nivel(paula, civic["id"])
+    assert dados_nivel["nivel"] == 8 and dados_nivel["km_desde"] == 500
+    # 500 km / 12,5 = 40 L gastos; sobram 16 L de 56 = 2,3 oitavos -> 2 (1/4).
+    assert (dados_nivel["nivel_estimado"], dados_nivel["km_por_litro"]) == (2, "12.5")
+
+
+def test_marcacao_mais_recente_vale_e_sem_km_rodado_nao_estima(paula, civic, hoje):
+    abastecer(paula, civic["id"], hoje - timedelta(days=1), 84600)
+    marcar(paula, civic["id"], hoje, 85000, 3)
+    dados_nivel = nivel(paula, civic["id"])
+    assert (dados_nivel["nivel"], dados_nivel["origem"], dados_nivel["data"]) == (3, "marcacao", str(hoje))
+    assert dados_nivel["km_desde"] == 0 and dados_nivel["nivel_estimado"] is None
+
+
+def test_atualizar_km_com_nivel_aparece_como_nivel_atual(paula, civic, hoje):
+    resposta = paula.post(f"/api/veiculos/{civic['id']}/leituras", json={"quilometragem": 85200, "nivel": 5})
+    assert resposta.status_code == 201
+    assert (nivel(paula, civic["id"])["nivel"], nivel(paula, civic["id"])["quilometragem"]) == (5, 85200)
+
+
+def test_parcial_com_nivel_antes_soma_os_litros(paula, civic, hoje):
+    # 1/4 (2 oitavos) + 20 L de 56 (2,9 oitavos) = 4,9 -> 5 oitavos (2,5/4).
+    abastecer(paula, civic["id"], hoje - timedelta(days=1), 84600, litros="20.000", tanque_cheio=False,
+              nivel_antes=2)
+    assert nivel(paula, civic["id"])["nivel"] == 5
+
+
+def test_parcial_sem_nivel_antes_diz_que_nao_da_para_saber(paula, civic, hoje):
+    abastecer(paula, civic["id"], hoje - timedelta(days=2), 84000)
+    abastecer(paula, civic["id"], hoje - timedelta(days=1), 84500, litros="20.000", tanque_cheio=False)
+    dados_nivel = nivel(paula, civic["id"])
+    assert dados_nivel["disponivel"] is False and dados_nivel["nivel"] is None
+    assert "não encheu o tanque e foi sem o nível" in dados_nivel["motivo"]
+
+
+def test_eletrico_nao_tem_nivel_de_tanque(paula):
+    leaf = criar_veiculo(paula, placa="ELE7R01", tipo_combustivel="eletrico", capacidade_tanque=None)
+    dados_nivel = nivel(paula, leaf["id"])
+    assert dados_nivel["disponivel"] is False and "não tem tanque" in dados_nivel["motivo"]

@@ -330,11 +330,13 @@ describe("Quilometragem", () => {
     renderizarApp("/veiculos/7/km");
     expect(await screen.findByText("Cadastro do veículo", { exact: false })).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText("Quilometragem"), "85450");
+    await userEvent.click(screen.getByRole("radio", { name: "1,5/4" }));
     await userEvent.click(screen.getByRole("button", { name: "Salvar leitura" }));
-    expect(await screen.findByText("Quilometragem atualizada.")).toBeInTheDocument();
+    expect(await screen.findByText(
+      "Quilometragem atualizada. O nível do tanque entrou no cálculo do consumo.")).toBeInTheDocument();
     expect(screen.getByText("85.450 km")).toBeInTheDocument();
     expect(JSON.parse(corpoDe(buscar, "POST /api/veiculos/7/leituras") as string)).toEqual({
-      quilometragem: 85450, data_leitura: hojeIso(),
+      quilometragem: 85450, data_leitura: hojeIso(), nivel: 3,
     });
   });
 
@@ -347,6 +349,7 @@ describe("Quilometragem", () => {
     renderizarApp("/veiculos/7/km");
     await userEvent.type(await screen.findByLabelText("Quilometragem"), "70000");
     fireEvent.change(screen.getByLabelText("Data da leitura"), { target: { value: "2026-01-10" } });
+    await userEvent.click(screen.getByRole("radio", { name: "2/4" }));
     await userEvent.click(screen.getByRole("button", { name: "Salvar leitura" }));
     expect(await screen.findByText(/A quilometragem atual não mudou/)).toBeInTheDocument();
   });
@@ -360,9 +363,62 @@ describe("Quilometragem", () => {
     });
     renderizarApp("/veiculos/7/km");
     await userEvent.type(await screen.findByLabelText("Quilometragem"), "84000");
+    await userEvent.click(screen.getByRole("radio", { name: "Cheio" }));
     await userEvent.click(screen.getByRole("button", { name: "Salvar leitura" }));
     expect(await screen.findByText(mensagem)).toBeInTheDocument();
     expect(screen.getByLabelText("Quilometragem")).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("exige o nível do combustível antes de salvar", async () => {
+    const buscar = apiFalsa({ ...COM_CIVIC, [LISTA]: () => pagina([LEITURA]) });
+    renderizarApp("/veiculos/7/km");
+    await userEvent.type(await screen.findByLabelText("Quilometragem"), "85450");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar leitura" }));
+    expect(screen.getByText("Informe o nível do combustível: ele entra no cálculo do consumo."))
+      .toBeInTheDocument();
+    expect(chamadasPara(buscar, "POST /api/veiculos/7/leituras")).toHaveLength(0);
+  });
+
+  it("elétrico atualiza o km sem nível", async () => {
+    const leaf = { ...CIVIC, tipo_combustivel: "eletrico" as const, capacidade_tanque: null };
+    const buscar = apiFalsa({
+      ...COM_CIVIC,
+      "GET /api/veiculos": () => json(200, [leaf]),
+      "GET /api/veiculos/7": () => json(200, leaf),
+      [LISTA]: () => pagina([LEITURA]),
+      "POST /api/veiculos/7/leituras": () => json(201, { ...leaf, quilometragem: 85450 }),
+    });
+    renderizarApp("/veiculos/7/km");
+    await userEvent.type(await screen.findByLabelText("Quilometragem"), "85450");
+    expect(screen.queryByRole("radiogroup", { name: /Nível do combustível/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Salvar leitura" }));
+    expect(await screen.findByText("Quilometragem atualizada.")).toBeInTheDocument();
+    expect(JSON.parse(corpoDe(buscar, "POST /api/veiculos/7/leituras") as string)).toEqual({
+      quilometragem: 85450, data_leitura: hojeIso(), nivel: null,
+    });
+  });
+
+  it("sem o tamanho do tanque, pede para completar o cadastro antes", async () => {
+    const antigo = { ...CIVIC, capacidade_tanque: null, tanque_pendente: true };
+    apiFalsa({
+      ...COM_CIVIC,
+      "GET /api/veiculos": () => json(200, [antigo]),
+      "GET /api/veiculos/7": () => json(200, antigo),
+      [LISTA]: () => pagina([LEITURA]),
+    });
+    renderizarApp("/veiculos/7/km");
+    expect(await screen.findByText(/informe antes o tamanho do tanque/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Completar cadastro" })).toHaveAttribute("href", "/veiculos/7/editar");
+    expect(screen.queryByRole("button", { name: "Salvar leitura" })).not.toBeInTheDocument();
+  });
+
+  it("leitura com nível aponta para a marcação do tanque para corrigir", async () => {
+    const daMarcacao: LeituraKm = { ...LEITURA, id: 40, quilometragem: 85450, origem: "medicao_tanque",
+      origem_id: 12, editavel: false };
+    apiFalsa({ ...COM_CIVIC, [LISTA]: () => pagina([daMarcacao, LEITURA]) });
+    renderizarApp("/veiculos/7/km");
+    expect(await screen.findByRole("link", { name: "edite a marcação do tanque" }))
+      .toHaveAttribute("href", "/veiculos/7/tanque/marcacoes/12");
   });
 
   it("não aceita data futura nem campo vazio", async () => {

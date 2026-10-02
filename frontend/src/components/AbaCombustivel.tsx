@@ -25,7 +25,7 @@ import { arredondarUmaCasa, formatarDecimal, formatarDinheiro, formatarKm, lerDe
 import CampoTexto from "./CampoTexto";
 import { Carregando, ErroComNovaTentativa } from "./EstadoDaTela";
 import { IconeBomba, IconeCheck, IconeSeta } from "./Icones";
-import { faixaDoMarcador, textoDoKmPorLitro } from "./PecasTanque";
+import { faixaDoMarcador, NivelDoTanqueCartao, textoDoKmPorLitro } from "./PecasTanque";
 
 const POR_PAGINA = 30;
 
@@ -439,6 +439,9 @@ export default function AbaCombustivel({ veiculo }: { veiculo: Veiculo }) {
   return (
     <>
       <AvisosDoTanque veiculo={veiculo} resumo={resumo} />
+      {veiculo.tipo_combustivel !== "eletrico" && (
+        <NivelDoTanqueCartao veiculoId={veiculo.id} nivel={resumo.nivel_tanque} podeAtualizar={veiculo.ativo} />
+      )}
       <Medias resumo={resumo} />
       {resumo.comparacao && (
         <CartaoComparacao comparacao={resumo.comparacao} simulando={simulando} erroSimulacao={erroSimulacao}

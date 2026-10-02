@@ -424,7 +424,7 @@ def test_garantia_vale_ate_o_limite_atingido_primeiro(banco, paula, civic, hoje)
     assert "95.000 km" in criada["garantia_explicacao"]
 
     # O hodômetro passa do limite antes da data: acabou.
-    paula.post(f"/api/veiculos/{civic['id']}/leituras", json={"quilometragem": 95001})
+    paula.post(f"/api/veiculos/{civic['id']}/leituras", json={"quilometragem": 95001, "nivel": 4})
     detalhe = paula.get(caminho).json()
     assert detalhe["garantia_situacao"] == "vencida" and "95.000 km" in detalhe["garantia_explicacao"]
 

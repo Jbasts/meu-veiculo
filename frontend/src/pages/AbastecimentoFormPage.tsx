@@ -6,7 +6,7 @@ import BotaoEnviar from "../components/BotaoEnviar";
 import CampoTexto from "../components/CampoTexto";
 import { Carregando, ErroComNovaTentativa } from "../components/EstadoDaTela";
 import { Chave, DialogoConfirmacao, GrupoOpcoes } from "../components/Formulario";
-import { faixaDoMarcador, SeletorDeNivel, textoDoKmPorLitro } from "../components/PecasTanque";
+import { faixaDoMarcador, SeletorDeNivel, textoDoKmPorLitro, textoDoUltimoNivel } from "../components/PecasTanque";
 import TopoComVoltar from "../components/TopoComVoltar";
 import { useVeiculos } from "../contexts/VeiculosContext";
 import { useEnvioFormulario } from "../hooks/useEnvioFormulario";
@@ -28,6 +28,7 @@ import {
   type Abastecimento,
   type Combustivel,
   type DadosAbastecimento,
+  type NivelTanque,
   type ResumoCombustivel,
 } from "../types/abastecimento";
 import type { Veiculo } from "../types/veiculo";
@@ -297,7 +298,8 @@ function Formulario({ veiculo, resumo, existente, titulo, voltar }: {
                 <SeletorDeNivel rotulo="Marcador antes de abastecer" opcional valor={campos.nivel}
                   aoMudar={(n) => mudar("nivel", n)} erro={errosCampo.nivel_antes}
                   dica={campos.nivel === null
-                    ? "Opcional. Com ele, o consumo aparece mesmo sem completar o tanque." : undefined} />
+                    ? `Opcional. Com ele, o consumo aparece mesmo sem completar o tanque.${dicaDoNivel(resumo.nivel_tanque)}`
+                    : undefined} />
                 {falta && (
                   <p className="texto-suave cabe-no-tanque">
                     Com o marcador em {rotuloDoNivel(campos.nivel!)}, cabem cerca de {formatarDecimal(arredondarUmaCasa(falta))} {u.curta}
@@ -417,4 +419,11 @@ function Formulario({ veiculo, resumo, existente, titulo, voltar }: {
       </main>
     </div>
   );
+}
+
+/** " Último nível: 3/4 em 02/10/2026 (≈ 1/4 agora)." para ajudar a conferir o marcador. */
+function dicaDoNivel(n: NivelTanque): string {
+  if (!n.disponivel || n.nivel === null) return "";
+  const agora = n.nivel_estimado !== null ? ` (≈ ${rotuloDoNivel(n.nivel_estimado)} agora)` : "";
+  return ` Último nível: ${textoDoUltimoNivel(n)}${agora}.`;
 }

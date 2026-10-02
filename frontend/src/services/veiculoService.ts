@@ -37,11 +37,13 @@ export function listarLeituras(veiculoId: number, pagina = 1, porPagina = 20): P
 }
 
 /** Nova leitura do hodômetro. Devolve o veículo com a quilometragem recalculada. */
+/** "Atualizar km". nivel: oitavos do tanque, obrigatório em veículo com tanque (null no elétrico). */
 export function registrarLeitura(veiculoId: number, quilometragem: number,
-  dataLeitura: string | null): Promise<Veiculo> {
+  dataLeitura: string | null, nivel: number | null): Promise<Veiculo> {
   return chamarApi<Veiculo>("POST", `/veiculos/${veiculoId}/leituras`, {
     quilometragem,
     data_leitura: dataLeitura,
+    nivel,
   });
 }
 

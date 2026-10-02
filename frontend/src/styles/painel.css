@@ -382,3 +382,36 @@
   margin: 6px 4px 0;
   font-size: 0.9rem;
 }
+
+/* Cartão "Próximos gastos" do Início: lista curta dentro do cartão. */
+.proximos-gastos {
+  margin: 0.5rem 0 0;
+  border-top: 1px solid var(--cor-borda);
+}
+
+.proximos-gastos .lista-simples__item {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* Nível do tanque: marcador em 8 partes (oitavos). */
+.medidor-tanque {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+  margin: 0.25rem 0 0.5rem;
+}
+
+.medidor-tanque__parte {
+  height: 12px;
+  border-radius: 4px;
+  background: var(--cor-neutro-fundo);
+}
+
+.medidor-tanque__parte--cheia {
+  background: var(--cor-primaria);
+}
+
+.medidor-tanque__parte--baixa {
+  background: var(--cor-destaque);
+}
