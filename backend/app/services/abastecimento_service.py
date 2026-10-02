@@ -1,8 +1,13 @@
 """Regras dos abastecimentos, do consumo e da comparação etanol × gasolina.
 
-Valor total (decisões da Paula, 01/10/2026)
-- O backend calcula litros × preço por litro, arredondado para centavos meio
-  para cima (38,5 × 4,29 = 165,165 → R$ 165,17).
+Litros, preço e valor total (decisões da Paula, 01/10/2026)
+- Basta informar dois dos três; o backend calcula o terceiro:
+    valor total     = litros × preço por litro (centavos, meio para cima:
+                      38,5 × 4,29 = 165,165 → R$ 165,17)
+    litros          = valor total ÷ preço por litro (3 casas, meio para cima)
+    preço por litro = valor total ÷ litros (3 casas, meio para cima)
+  Quando os litros ou o preço são calculados, o valor total informado (o
+  que a bomba mostrou) é gravado como veio.
 - Se a pessoa informar o valor do cupom, ele é gravado quando a diferença
   para o calculado é de no máximo R$ 50,00 (era R$ 0,10 na 0008; ampliado a
   pedido dela na 0009); diferença maior é recusada como provável erro de
@@ -22,6 +27,11 @@ Combustível
 - Unidade: litro; m³ no GNV; kWh na eletricidade (a coluna é a mesma
   "litros"). Num híbrido, alternar gasolina e recarga entre dois "cheios" é
   mistura: aquele ciclo fica sem consumo.
+
+Tanque (services/tanque.py)
+- nivel_antes: o marcador antes de abastecer, opcional, só para gasolina,
+  etanol e diesel. Com o tamanho do tanque, ele vira ponto do cálculo de
+  consumo (services/consumo.py) e confere se os litros cabem no tanque.
 
 Hodômetro
 - A quilometragem é obrigatória e vira leitura: precisa combinar com as outras
@@ -44,6 +54,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from typing import Callable, Protocol
 
 from app.entities.abastecimento import (
+    COMBUSTIVEIS_COM_MARCADOR,
     COMBUSTIVEIS_DO_VEICULO,
     ETANOL,
     GASOLINA,
@@ -55,9 +66,10 @@ from app.entities.veiculo import Veiculo
 from app.services import calendario
 from app.services.acesso_veiculo import AcessoVeiculo
 from app.services.calendario import data_br, numero_br
-from app.services.consumo import Media, Situacao, calcular, medias
+from app.services.consumo import Media, MesDeConsumo, Resultado, Situacao, calcular_tudo, medias, por_mes
 from app.services.erros import DadosInvalidos, NaoEncontrado
 from app.services.paginacao import Pagina, limite_e_deslocamento
+from app.services.tanque import combustivel_inicial, conferir_se_cabe, tanque_pendente, validar_nivel
 from app.services.veiculo_service import validar_quilometragem
 
 CENTAVO = Decimal("0.01")
@@ -82,6 +94,11 @@ class Transacional(Protocol):
 def calcular_total(litros: Decimal, preco: Decimal) -> Decimal:
     """Litros × preço por litro, em centavos, meio para cima."""
     return (litros * preco).quantize(CENTAVO, rounding=ROUND_HALF_UP)
+
+
+def dividir(total: Decimal, divisor: Decimal) -> Decimal:
+    """Valor total ÷ preço (= litros) ou ÷ litros (= preço), com 3 casas, meio para cima."""
+    return (total / divisor).quantize(MILESIMO, rounding=ROUND_HALF_UP)
 
 
 def percentual(valor: Decimal) -> int:
@@ -124,15 +141,29 @@ class ResumoCombustivel:
     comparacao: Comparacao | None   # só para veículo flex
     postos_recentes: list[str]
     ultima_quilometragem: int
+    capacidade_tanque: Decimal | None
+    tanque_pendente: bool           # tem tanque, mas falta o tamanho no cadastro
+    marcacao_do_mes_pendente: bool  # ainda não marcou o km e o nível neste mês
+    meses: list[MesDeConsumo]       # do mais recente para o mais antigo (até 12)
+
+
+MESES_NO_RESUMO = 12
+
+
+def calcular_do_veiculo(veiculo: Veiculo, abastecimentos: list, medicoes: list) -> Resultado:
+    """O cálculo de consumo com tudo o que se sabe do veículo (tanque e marcações)."""
+    return calcular_tudo(abastecimentos, medicoes, veiculo.capacidade_tanque,
+                         combustivel_inicial(veiculo.tipo_combustivel))
 
 
 class AbastecimentoService:
-    def __init__(self, uow: Transacional, veiculos, abastecimentos, leituras, *,
+    def __init__(self, uow: Transacional, veiculos, abastecimentos, leituras, medicoes, *,
                  hoje: Callable[[], date] = calendario.hoje):
         self._uow = uow
         self._veiculos = veiculos
         self._abastecimentos = abastecimentos
         self._leituras = leituras
+        self._medicoes = medicoes
         self._acesso = AcessoVeiculo(veiculos)
         self._hoje = hoje
 
@@ -143,10 +174,10 @@ class AbastecimentoService:
             raise NaoEncontrado("Abastecimento não encontrado.")
         return a
 
-    def _situacoes(self, veiculo_id: int) -> tuple[list[Abastecimento], dict[int, Situacao], list]:
-        todos = self._abastecimentos.todos(veiculo_id)
-        situacoes, ciclos = calcular(todos)
-        return todos, situacoes, ciclos
+    def _situacoes(self, veiculo: Veiculo) -> tuple[list[Abastecimento], dict[int, Situacao], list]:
+        todos = self._abastecimentos.todos(veiculo.id)
+        r = calcular_do_veiculo(veiculo, todos, self._medicoes.todas(veiculo.id))
+        return todos, r.situacoes, r.ciclos
 
     # ------------------------------------------------------------------ validação
     def _validar(self, veiculo: Veiculo, dados: dict, atual: Abastecimento | None) -> dict:
@@ -172,20 +203,13 @@ class AbastecimentoService:
         if data > self._hoje():
             raise DadosInvalidos("A data não pode ser no futuro.", campo="data")
         km = validar_quilometragem(dados.get("quilometragem"))
-        unidade = UNIDADES.get(combustivel, "os litros")
-        litros = _decimal(dados.get("litros"), "litros", unidade, LITROS_MAXIMO, MILESIMO)
-        preco = _decimal(dados.get("valor_litro"), "valor_litro", "o preço", PRECO_MAXIMO, MILESIMO)
-        calculado = calcular_total(litros, preco)
-        total = calculado
-        informado = dados.get("valor_total")
-        if informado is not None:
-            if not informado.is_finite() or informado != informado.quantize(CENTAVO):
-                raise DadosInvalidos("Use no máximo duas casas decimais (centavos).", campo="valor_total")
-            if abs(informado - calculado) > TOLERANCIA_DO_CUPOM:
-                raise DadosInvalidos(
-                    f"O valor do cupom difere mais de R$ 50,00 do calculado (R$ {calculado}). "
-                    "Confira os litros e o preço.", campo="valor_total")
-            total = informado
+        litros, preco, total = self._litros_preco_e_total(combustivel, dados)
+        nivel = validar_nivel(dados.get("nivel_antes"), "nivel_antes", obrigatorio=False)
+        if nivel is not None and combustivel not in COMBUSTIVEIS_COM_MARCADOR:
+            raise DadosInvalidos("O nível do marcador é só do tanque de combustível líquido, não de "
+                                 f"{NOMES[combustivel]}.", campo="nivel_antes")
+        if combustivel in COMBUSTIVEIS_COM_MARCADOR:
+            conferir_se_cabe(veiculo.capacidade_tanque, litros, nivel)
         posto = " ".join((dados.get("posto") or "").split()) or None
         if posto and len(posto) > TAMANHO_MAXIMO_POSTO:
             raise DadosInvalidos(f"Nome do posto longo demais (máximo {TAMANHO_MAXIMO_POSTO} caracteres).",
@@ -193,7 +217,46 @@ class AbastecimentoService:
         self._conferir_hodometro(veiculo, km, data, atual)
         return {"combustivel": combustivel, "tipo": tipo, "data": data, "quilometragem": km, "litros": litros,
                 "valor_litro": preco, "valor_total": total, "tanque_cheio": bool(dados.get("tanque_cheio")),
-                "posto": posto}
+                "nivel_antes": nivel, "posto": posto}
+
+    @staticmethod
+    def _litros_preco_e_total(combustivel: str, dados: dict) -> tuple[Decimal, Decimal, Decimal]:
+        """Dois dos três bastam; o terceiro é calculado (veja o topo do arquivo)."""
+        unidade = UNIDADES.get(combustivel, "os litros")
+        informado = dados.get("valor_total")
+        if informado is not None:
+            if not informado.is_finite() or informado != informado.quantize(CENTAVO):
+                raise DadosInvalidos("Use no máximo duas casas decimais (centavos).", campo="valor_total")
+            if informado <= 0:
+                raise DadosInvalidos("O valor total precisa ser maior que zero.", campo="valor_total")
+        tem_litros = dados.get("litros") is not None
+        tem_preco = dados.get("valor_litro") is not None
+        if informado is not None and not (tem_litros and tem_preco):
+            if not tem_litros and not tem_preco:
+                raise DadosInvalidos(f"Informe o preço ou {unidade}.", campo="valor_litro")
+            if tem_preco:
+                preco = _decimal(dados.get("valor_litro"), "valor_litro", "o preço", PRECO_MAXIMO, MILESIMO)
+                litros = dividir(informado, preco)
+                if litros <= 0:
+                    raise DadosInvalidos("Valor total baixo demais para este preço.", campo="valor_total")
+                _decimal(litros, "litros", unidade, LITROS_MAXIMO, MILESIMO)
+            else:
+                litros = _decimal(dados.get("litros"), "litros", unidade, LITROS_MAXIMO, MILESIMO)
+                preco = dividir(informado, litros)
+                if preco <= 0:
+                    raise DadosInvalidos("Valor total baixo demais para esta quantidade.", campo="valor_total")
+                _decimal(preco, "valor_litro", "o preço", PRECO_MAXIMO, MILESIMO)
+            return litros, preco, informado
+        litros = _decimal(dados.get("litros"), "litros", unidade, LITROS_MAXIMO, MILESIMO)
+        preco = _decimal(dados.get("valor_litro"), "valor_litro", "o preço", PRECO_MAXIMO, MILESIMO)
+        calculado = calcular_total(litros, preco)
+        if informado is None:
+            return litros, preco, calculado
+        if abs(informado - calculado) > TOLERANCIA_DO_CUPOM:
+            raise DadosInvalidos(
+                f"O valor do cupom difere mais de R$ 50,00 do calculado (R$ {calculado}). "
+                "Confira os litros e o preço.", campo="valor_total")
+        return litros, preco, informado
 
     def _conferir_hodometro(self, veiculo: Veiculo, km: int, data: date, atual: Abastecimento | None) -> None:
         conflitos = self._leituras.conflitos(
@@ -211,7 +274,7 @@ class AbastecimentoService:
         """Do mais recente para o mais antigo, cada um com a situação no cálculo do consumo."""
         veiculo = self._acesso.exigir(usuario, veiculo_id)
         pagina, por_pagina, limite, deslocamento = limite_e_deslocamento(pagina, por_pagina)
-        todos, situacoes, _ = self._situacoes(veiculo.id)
+        todos, situacoes, _ = self._situacoes(veiculo)
         recentes = list(reversed(todos))[deslocamento:deslocamento + limite]
         return Pagina(itens=[AbastecimentoDetalhe(a, situacoes[a.id]) for a in recentes],
                       total=len(todos), pagina=pagina, por_pagina=por_pagina)
@@ -219,7 +282,7 @@ class AbastecimentoService:
     def obter(self, usuario: Usuario, veiculo_id: int, abastecimento_id: int) -> AbastecimentoDetalhe:
         veiculo = self._acesso.exigir(usuario, veiculo_id)
         a = self._do_veiculo(veiculo.id, abastecimento_id)
-        _, situacoes, _ = self._situacoes(veiculo.id)
+        _, situacoes, _ = self._situacoes(veiculo)
         return AbastecimentoDetalhe(a, situacoes[a.id])
 
     def resumo(self, usuario: Usuario, veiculo_id: int, preco_gasolina: Decimal | None = None,
@@ -231,7 +294,7 @@ class AbastecimentoService:
         if simulado:
             preco_gasolina = _decimal(preco_gasolina, "preco_gasolina", "o preço da gasolina", PRECO_MAXIMO, MILESIMO)
             preco_etanol = _decimal(preco_etanol, "preco_etanol", "o preço do etanol", PRECO_MAXIMO, MILESIMO)
-        todos, _, ciclos = self._situacoes(veiculo.id)
+        todos, _, ciclos = self._situacoes(veiculo)
         por_combustivel = medias(ciclos)
         aceitos = COMBUSTIVEIS_DO_VEICULO.get(veiculo.tipo_combustivel, ())
         comparacao = None
@@ -248,6 +311,12 @@ class AbastecimentoService:
             comparacao=comparacao,
             postos_recentes=self._abastecimentos.postos_recentes(veiculo.id),
             ultima_quilometragem=veiculo.quilometragem,
+            capacidade_tanque=veiculo.capacidade_tanque,
+            tanque_pendente=tanque_pendente(veiculo),
+            marcacao_do_mes_pendente=(
+                veiculo.ativo and veiculo.capacidade_tanque is not None
+                and not self._medicoes.existe_desde(veiculo.id, self._hoje().replace(day=1))),
+            meses=por_mes(ciclos)[:MESES_NO_RESUMO],
         )
 
     @staticmethod
@@ -275,7 +344,7 @@ class AbastecimentoService:
             veiculo = self._acesso.exigir_para_alterar(usuario, veiculo_id, bloquear=True)
             a = self._abastecimentos.criar(veiculo.id, self._validar(veiculo, dados, None))
             self._veiculos.recarregar(veiculo)  # a quilometragem pode ter mudado
-            _, situacoes, _ = self._situacoes(veiculo.id)
+            _, situacoes, _ = self._situacoes(veiculo)
         return AbastecimentoDetalhe(a, situacoes[a.id])
 
     def editar(self, usuario: Usuario, veiculo_id: int, abastecimento_id: int,
@@ -285,7 +354,7 @@ class AbastecimentoService:
             a = self._do_veiculo(veiculo.id, abastecimento_id)
             self._abastecimentos.atualizar(a, self._validar(veiculo, dados, a))
             self._veiculos.recarregar(veiculo)
-            _, situacoes, _ = self._situacoes(veiculo.id)
+            _, situacoes, _ = self._situacoes(veiculo)
         return AbastecimentoDetalhe(a, situacoes[a.id])
 
     def apagar(self, usuario: Usuario, veiculo_id: int, abastecimento_id: int) -> None:

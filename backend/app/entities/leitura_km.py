@@ -17,7 +17,8 @@ ORIGEM_CADASTRO = "cadastro"
 ORIGEM_MANUAL = "manual"
 ORIGEM_LEGADO = "legado"
 # Leituras que o usuário corrige na própria tela de quilometragem. As demais
-# vêm de um abastecimento, manutenção ou diagnóstico e são corrigidas lá.
+# vêm de um abastecimento, manutenção, diagnóstico ou marcação do tanque e são
+# corrigidas lá.
 ORIGENS_EDITAVEIS = (ORIGEM_CADASTRO, ORIGEM_MANUAL, ORIGEM_LEGADO)
 
 

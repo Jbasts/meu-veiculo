@@ -69,3 +69,15 @@ export const IconeSetaEsquerda = (p: Props) => <Icone {...p}><path d="M15 5l-7 7
 export const IconeProjeto = (p: Props) => (
   <Icone {...p}><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z" /></Icone>
 );
+export const IconeHistorico = (p: Props) => (
+  <Icone {...p}><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v4h4" /><path d="M12 8v4l3 2" /></Icone>
+);
+export const IconeEscudo = (p: Props) => (
+  <Icone {...p}><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z" /></Icone>
+);
+export const IconeLupa = (p: Props) => (
+  <Icone {...p}><circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4.3-4.3" /></Icone>
+);
+export const IconeAlerta = (p: Props) => (
+  <Icone {...p}><path d="M12 4l9 16H3z" /><path d="M12 10v4" /><path d="M12 17h.01" /></Icone>
+);

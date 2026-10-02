@@ -466,3 +466,91 @@
   justify-content: flex-start;
   margin: -8px 0 18px;
 }
+
+/* ------------------------------------------------ nível do tanque (marcador) */
+
+.nivel__escolhido {
+  color: var(--cor-primaria);
+}
+
+.nivel__barra {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.nivel__parte {
+  min-height: 46px;
+  padding: 0;
+  font-family: var(--fonte-texto);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--cor-texto);
+  background: var(--cor-cartao);
+  border: 1px solid #8e9da2;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.nivel__parte--cheia {
+  color: var(--cor-ok-texto);
+  background: var(--cor-ok-fundo);
+  border-color: var(--cor-primaria);
+}
+
+.nivel__parte--escolhida {
+  color: #fff;
+  background: var(--cor-primaria);
+}
+
+.nivel__parte:focus-visible {
+  outline: 3px solid var(--cor-destaque);
+  outline-offset: 2px;
+}
+
+.nivel__legenda {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+}
+
+.nivel__nao-sei {
+  margin: 0;
+  padding: 4px 10px;
+  color: var(--cor-primaria);
+}
+
+.nivel__nao-sei--ativo {
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.cabe-no-tanque {
+  margin: -6px 0 16px;
+  font-size: 0.95rem;
+}
+
+.total-abastecimento__rotulo small {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+}
+
+.consumo-mes {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.consumo-mes__valor {
+  text-align: right;
+}
+
+.cartao-consumo__faixa {
+  margin: 2px 0 0;
+  font-size: 0.9rem;
+  color: var(--cor-texto-claro);
+}

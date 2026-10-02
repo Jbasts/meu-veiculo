@@ -16,6 +16,14 @@ export default defineConfig({
       "/api": { target: "http://127.0.0.1:8000", xfwd: true },
     },
   },
+  // "npm run app:celular": versão gerada pelo build (com o service worker da
+  // PWA), servida na porta 4173. Usa o mesmo proxy /api do servidor de
+  // desenvolvimento. O backend continua só em 127.0.0.1: o celular fala com
+  // o Vite, e o Vite fala com o backend no próprio computador.
+  preview: {
+    port: 4173,
+    strictPort: true,
+  },
   test: {
     environment: "jsdom",
     setupFiles: ["./src/tests/setup.ts"],

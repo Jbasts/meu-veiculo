@@ -30,20 +30,27 @@ from app.banco.sessao import UnidadeDeTrabalho, abrir_sessao
 from app.banco.versao import problema_de_versao
 from app.config import Configuracoes, obter_configuracoes
 from app.controllers.abastecimento_controller import AbastecimentoController
+from app.controllers.medicao_tanque_controller import MedicaoTanqueController
+from app.controllers.admin_controller import AdminController
 from app.controllers.auth_controller import AuthController, ConfigCookie, ler_token
 from app.controllers.diagnostico_controller import DiagnosticoController
 from app.controllers.foto_controller import FotoController
 from app.controllers.gasto_controller import GastoController
+from app.controllers.historico_controller import HistoricoController
 from app.controllers.manutencao_controller import ManutencaoController
+from app.controllers.painel_controller import PainelController
 from app.controllers.projeto_controller import ProjetoController
 from app.controllers.saude_controller import SaudeController
 from app.controllers.veiculo_controller import VeiculoController
 from app.entities.sessao import SessaoAtual
 from app.repositories.abastecimento_repository import AbastecimentoRepository
+from app.repositories.medicao_tanque_repository import MedicaoTanqueRepository
+from app.repositories.admin_repository import AdminRepository
 from app.repositories.arquivo_foto_repository import ArquivoFotoRepository
 from app.repositories.diagnostico_repository import DiagnosticoRepository
 from app.repositories.foto_repository import FotoRepository
 from app.repositories.gasto_repository import FinancasRepository, GastoRepository
+from app.repositories.historico_repository import HistoricoRepository
 from app.repositories.leitura_km_repository import LeituraKmRepository
 from app.repositories.manutencao_repository import ManutencaoRepository, PlanoRepository
 from app.repositories.projeto_repository import ProjetoRepository
@@ -54,13 +61,18 @@ from app.repositories.tentativa_acesso_repository import TentativaAcessoReposito
 from app.repositories.usuario_repository import UsuarioRepository
 from app.repositories.veiculo_repository import VeiculoRepository
 from app.services.abastecimento_service import AbastecimentoService
+from app.services.medicao_tanque_service import MedicaoTanqueService
+from app.services.admin_service import AdminService
 from app.services.autenticacao_service import AutenticacaoService
+from app.services.custo_service import CustoService
 from app.services.diagnostico_service import DiagnosticoService
 from app.services.email_service import EnviadorEmail, criar_enviador
 from app.services.erros import AcessoNegado, ServicoIndisponivel
 from app.services.foto_service import FotoService
 from app.services.gasto_service import FinancasService, GastoService
+from app.services.historico_service import HistoricoService
 from app.services.manutencao_service import ManutencaoService, PlanoService
+from app.services.painel_service import PainelService
 from app.services.projeto_service import ProjetoService
 from app.services.quilometragem_service import QuilometragemService
 from app.services.saude_service import SaudeService
@@ -106,6 +118,7 @@ def obter_autenticacao_service(
         validade_sessao=timedelta(days=cfg.sessao_dias),
         validade_link=timedelta(minutes=cfg.recuperacao_minutos),
         url_frontend=cfg.url_frontend,
+        validade_convite=timedelta(days=cfg.convite_dias),
     )
 
 
@@ -193,7 +206,14 @@ def obter_diagnostico_controller(
 def obter_abastecimento_controller(sessao: SessaoDep) -> AbastecimentoController:
     return AbastecimentoController(AbastecimentoService(
         UnidadeDeTrabalho(sessao), VeiculoRepository(sessao), AbastecimentoRepository(sessao),
-        LeituraKmRepository(sessao),
+        LeituraKmRepository(sessao), MedicaoTanqueRepository(sessao),
+    ))
+
+
+def obter_medicao_tanque_controller(sessao: SessaoDep) -> MedicaoTanqueController:
+    return MedicaoTanqueController(MedicaoTanqueService(
+        UnidadeDeTrabalho(sessao), VeiculoRepository(sessao), AbastecimentoRepository(sessao),
+        LeituraKmRepository(sessao), MedicaoTanqueRepository(sessao),
     ))
 
 
@@ -203,6 +223,33 @@ def obter_gasto_controller(sessao: SessaoDep) -> GastoController:
         GastoService(UnidadeDeTrabalho(sessao), veiculos, GastoRepository(sessao)),
         FinancasService(veiculos, FinancasRepository(sessao)),
     )
+
+
+def obter_painel_controller(sessao: SessaoDep) -> PainelController:
+    veiculos = VeiculoRepository(sessao)
+    financas = FinancasRepository(sessao)
+    custo = CustoService(veiculos, financas, LeituraKmRepository(sessao))
+    return PainelController(
+        PainelService(veiculos, financas, GastoRepository(sessao), AbastecimentoRepository(sessao),
+                      MedicaoTanqueRepository(sessao), custo),
+        custo,
+    )
+
+
+def obter_historico_controller(sessao: SessaoDep) -> HistoricoController:
+    return HistoricoController(HistoricoService(VeiculoRepository(sessao), HistoricoRepository(sessao)))
+
+
+def obter_admin_controller(
+    sessao: SessaoDep,
+    autenticacao: AutenticacaoServiceDep,
+    senhas: Annotated[SenhaService, Depends(obter_senha_service)],
+    enviador: Annotated[EnviadorEmail, Depends(obter_enviador_email)],
+) -> AdminController:
+    return AdminController(AdminService(
+        UnidadeDeTrabalho(sessao), AdminRepository(sessao), UsuarioRepository(sessao),
+        SessaoRepository(sessao), RecuperacaoSenhaRepository(sessao), autenticacao, senhas,
+    ), enviador)
 
 
 # --------------------------------------------------------------------- proteções

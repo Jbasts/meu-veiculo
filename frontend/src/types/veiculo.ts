@@ -35,6 +35,10 @@ export interface Veiculo {
   km_aquisicao: number | null;
   data_aquisicao: string | null;
   valor_aquisicao: string | null;
+  /** Litros do tanque ("47.5"); null = não informado (veículo antigo) ou elétrico. */
+  capacidade_tanque: string | null;
+  /** Tem tanque, mas falta o tamanho no cadastro: a tela pede para informar. */
+  tanque_pendente: boolean;
   ativo: boolean;
   criado_em: string;
   em_uso: boolean;
@@ -53,13 +57,16 @@ export interface DadosVeiculo {
   data_aquisicao: string | null;
   valor_aquisicao: string | null;
   km_aquisicao: number | null;
+  /** Litros ("47.500"); obrigatório, menos no elétrico. */
+  capacidade_tanque: string | null;
 }
 
 export interface DadosNovoVeiculo extends DadosVeiculo {
   quilometragem: number;
 }
 
-export type OrigemLeitura = "cadastro" | "manual" | "abastecimento" | "manutencao" | "diagnostico" | "legado";
+export type OrigemLeitura = "cadastro" | "manual" | "abastecimento" | "manutencao" | "diagnostico" | "legado"
+  | "medicao_tanque";
 
 export interface LeituraKm {
   id: number;

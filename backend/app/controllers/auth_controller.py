@@ -78,6 +78,9 @@ class AuthController:
         self._service.sair(ler_token(requisicao))
         resposta = Response(status_code=204)
         self._apagar_cookie(resposta)
+        # Pede ao navegador que apague o que guardou deste endereço (por
+        # exemplo, fotos já vistas), para nada da conta sobrar no aparelho.
+        resposta.headers["Clear-Site-Data"] = '"cache"'
         return resposta
 
     def eu(self, atual: SessaoAtual) -> UsuarioResposta:

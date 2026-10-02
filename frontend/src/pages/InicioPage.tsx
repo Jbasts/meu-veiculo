@@ -3,7 +3,16 @@ import { Link } from "react-router";
 
 import AvatarInicial from "../components/AvatarInicial";
 import { Carregando, ErroComNovaTentativa } from "../components/EstadoDaTela";
-import { IconeDiagnostico, IconeSeta, IconeSetaBaixo } from "../components/Icones";
+import {
+  IconeAlerta,
+  IconeBomba,
+  IconeDiagnostico,
+  IconeManutencao,
+  IconeRecibo,
+  IconeSeta,
+  IconeSetaBaixo,
+} from "../components/Icones";
+import { BarraEmPartes, periodoCurtoDoCustoPorKm } from "../components/PecasCusto";
 import { TOM_DA_GRAVIDADE } from "../components/PecasDiagnostico";
 import { destinoDaPendencia, IconeDaSituacao, TOM_DA_SITUACAO } from "../components/PecasManutencao";
 import { Hodometro, Placa } from "../components/PecasVeiculo";
@@ -11,9 +20,13 @@ import { useAuth } from "../contexts/AuthContext";
 import { useVeiculos } from "../contexts/VeiculosContext";
 import { listarDiagnosticos } from "../services/diagnosticoService";
 import { listarPendentes } from "../services/manutencaoService";
+import { obterPainel } from "../services/painelService";
+import { ROTULO_COMBUSTIVEL, unidade, type Combustivel } from "../types/abastecimento";
 import { rotuloGravidade, type DiagnosticoResumo } from "../types/diagnostico";
 import { resumoDoPrazo, type Pendencia } from "../types/manutencao";
-import { formatarDataIso } from "../utils/datas";
+import type { AvisosDoTanque, ContasEmAtraso, PainelInicio } from "../types/painel";
+import { formatarDataIso, nomeDoMes } from "../utils/datas";
+import { formatarDecimal, formatarDinheiro } from "../utils/formatos";
 
 const MAXIMO_DE_ALERTAS = 5;
 
@@ -23,11 +36,86 @@ function textoDoDiagnostico(d: DiagnosticoResumo): string {
     + `gravidade ${rotuloGravidade(d.gravidade).toLowerCase()}`;
 }
 
+/** "2 contas vencidas, R$ 1.288,38 em atraso" e "1 conta vence hoje" (gastos pendentes). */
+function AlertasDeContas({ contas }: { contas: ContasEmAtraso }) {
+  const linhas: { titulo: string; texto: string; tom: string }[] = [];
+  if (contas.vencidas > 0) {
+    linhas.push({
+      titulo: contas.vencidas === 1 ? "1 conta vencida" : `${contas.vencidas} contas vencidas`,
+      texto: `${formatarDinheiro(contas.total_vencidas)} em atraso`,
+      tom: "alerta",
+    });
+  }
+  if (contas.vencem_hoje > 0) {
+    linhas.push({
+      titulo: contas.vencem_hoje === 1 ? "1 conta vence hoje" : `${contas.vencem_hoje} contas vencem hoje`,
+      texto: "Veja em Finanças → A vencer",
+      tom: "aviso",
+    });
+  }
+  return (
+    <ul className="cartao lista-simples" aria-label="Contas a pagar">
+      {linhas.map((l) => (
+        <li key={l.titulo}>
+          <Link to="/financas" className="lista-simples__item">
+            <span className={`pendencia__icone pendencia__icone--${l.tom}`}><IconeAlerta /></span>
+            <span className="lista-simples__texto">
+              <span className="lista-simples__titulo">{l.titulo}</span>
+              <span className={`alerta-texto alerta-texto--${l.tom}`}>{l.texto}</span>
+            </span>
+            <IconeSeta tamanho={20} />
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Tamanho do tanque que falta no cadastro e a marcação do início do mês. */
+function AlertasDoTanque({ veiculoId, tanque }: { veiculoId: number; tanque: AvisosDoTanque }) {
+  const linhas: { titulo: string; texto: string; para: string; tom: string }[] = [];
+  if (tanque.tamanho_pendente) {
+    linhas.push({
+      titulo: "Informe o tamanho do tanque",
+      texto: "Atualize o cadastro do veículo: ele confere os litros ao abastecer e usa o nível do marcador",
+      para: `/veiculos/${veiculoId}/editar`,
+      tom: "aviso",
+    });
+  }
+  if (tanque.marcacao_do_mes_pendente) {
+    linhas.push({
+      titulo: "Marque o km e o nível do tanque",
+      texto: "Uma vez no início do mês: deixa o consumo do mês mais exato",
+      para: `/veiculos/${veiculoId}/tanque/marcacoes/nova`,
+      tom: "aviso",
+    });
+  }
+  return (
+    <ul className="cartao lista-simples" aria-label="Tanque">
+      {linhas.map((l) => (
+        <li key={l.titulo}>
+          <Link to={l.para} className="lista-simples__item">
+            <span className={`pendencia__icone pendencia__icone--${l.tom}`}><IconeBomba /></span>
+            <span className="lista-simples__texto">
+              <span className="lista-simples__titulo">{l.titulo}</span>
+              <span className="texto-suave">{l.texto}</span>
+            </span>
+            <IconeSeta tamanho={20} />
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /**
- * "Precisa de atenção": manutenções atrasadas e próximas e problemas em
- * aberto do veículo em uso. Cada fonte falha sozinha, sem esconder a outra.
+ * "Precisa de atenção": manutenções atrasadas e próximas, problemas em aberto,
+ * contas vencidas e avisos do tanque do veículo em uso. Cada fonte falha
+ * sozinha, sem esconder a outra.
  */
-function PrecisaDeAtencao({ veiculoId }: { veiculoId: number }) {
+function PrecisaDeAtencao({ veiculoId, contas, tanque }: {
+  veiculoId: number; contas: ContasEmAtraso | null; tanque: AvisosDoTanque | null;
+}) {
   const [itens, setItens] = useState<Pendencia[] | null>(null);
   const [falhou, setFalhou] = useState(false);
   const [problemas, setProblemas] = useState<{ itens: DiagnosticoResumo[]; total: number } | null>(null);
@@ -59,11 +147,13 @@ function PrecisaDeAtencao({ veiculoId }: { veiculoId: number }) {
 
   const temManutencao = itens !== null && itens.length > 0;
   const temProblema = problemas !== null && problemas.total > 0;
+  const temConta = contas !== null && contas.vencidas + contas.vencem_hoje > 0;
+  const temTanque = tanque !== null && (tanque.tamanho_pendente || tanque.marcacao_do_mes_pendente);
   return (
     <>
       {falhou && <p className="texto-suave">Não foi possível carregar os alertas de manutenção.</p>}
       {falhouProblemas && <p className="texto-suave">Não foi possível carregar os diagnósticos em aberto.</p>}
-      {(temManutencao || temProblema) && (
+      {(temManutencao || temProblema || temConta || temTanque) && (
         <section aria-label="Precisa de atenção">
           <h2 className="titulo-secao">Precisa de atenção</h2>
           {temManutencao && <AlertasDeManutencao veiculoId={veiculoId} itens={itens} />}
@@ -92,6 +182,8 @@ function PrecisaDeAtencao({ veiculoId }: { veiculoId: number }) {
               )}
             </>
           )}
+          {temConta && <AlertasDeContas contas={contas} />}
+          {temTanque && <AlertasDoTanque veiculoId={veiculoId} tanque={tanque} />}
         </section>
       )}
     </>
@@ -129,9 +221,133 @@ function AlertasDeManutencao({ veiculoId, itens }: { veiculoId: number; itens: P
   );
 }
 
-// Tela inicial (PDF, página 2). Mostra o veículo em uso, a quilometragem, os
-// alertas de manutenção e os problemas em aberto. Os atalhos e os indicadores
-// de gastos e consumo entram com os módulos correspondentes.
+/** Abastecer, Gasto, Manutenção e Problema (PDF, página 2). */
+function Atalhos({ veiculoId }: { veiculoId: number }) {
+  const base = `/veiculos/${veiculoId}`;
+  const atalhos = [
+    { para: `${base}/abastecimentos/novo`, rotulo: "Abastecer", Icone: IconeBomba },
+    { para: `${base}/gastos/novo`, rotulo: "Gasto", Icone: IconeRecibo },
+    { para: `${base}/manutencoes/nova`, rotulo: "Manutenção", Icone: IconeManutencao },
+    { para: `${base}/diagnosticos/novo`, rotulo: "Problema", Icone: IconeDiagnostico },
+  ];
+  return (
+    <nav className="atalhos" aria-label="Registrar">
+      {atalhos.map(({ para, rotulo, Icone }) => (
+        <Link key={rotulo} to={para} className="atalhos__item">
+          <Icone />
+          <span>{rotulo}</span>
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+/** "Gastos em outubro": as mesmas despesas da aba Finanças, em três grupos. */
+function GastosDoMesCartao({ painel }: { painel: PainelInicio }) {
+  const mes = painel.gastos_do_mes;
+  const nome = nomeDoMes({ ano: mes.ano, mes: mes.mes }).split(" ")[0].toLowerCase();
+  return (
+    <section className="cartao custo" aria-label={`Gastos em ${nome}`}>
+      <div className="custo__topo">
+        <span className="texto-suave">Gastos em {nome}</span>
+        <Link to="/financas" className="link">Ver finanças</Link>
+      </div>
+      <p className="custo__valor">{formatarDinheiro(mes.total)}</p>
+      {mes.parcelas.length > 0
+        ? <BarraEmPartes parcelas={mes.parcelas} singular rotulo={`Gastos em ${nome} por grupo`} />
+        : <p className="texto-suave">Nenhuma despesa registrada em {nome}.</p>}
+    </section>
+  );
+}
+
+/** Consumo médio e custo por km. Sem base, mostra "Dados insuficientes" e o motivo (nunca zero). */
+function Indicadores({ veiculoId, painel }: { veiculoId: number; painel: PainelInicio }) {
+  const { consumo, custo_por_km: km } = painel;
+  const medida = consumo.combustivel ? unidade(consumo.combustivel).consumo : "km/L";
+  return (
+    <div className="indicadores">
+      <Link to="/financas?aba=combustivel" className="cartao indicador" aria-label="Consumo médio">
+        <span className="texto-suave">Consumo médio</span>
+        {consumo.disponivel && consumo.valor !== null ? (
+          <>
+            <span className="indicador__valor">
+              {consumo.estimado && "≈ "}{formatarDecimal(consumo.valor, 1)} <small>{medida}</small>
+            </span>
+            <span className="texto-suave">
+              {ROTULO_COMBUSTIVEL[consumo.combustivel as Combustivel] ?? consumo.combustivel}
+            </span>
+            {consumo.estimado && consumo.minimo && consumo.maximo && (
+              <span className="indicador__periodo">
+                Pelo marcador: entre {formatarDecimal(consumo.minimo, 1)} e {formatarDecimal(consumo.maximo, 1)}
+              </span>
+            )}
+            {consumo.inicio && consumo.fim && (
+              <span className="indicador__periodo">
+                {formatarDataIso(consumo.inicio)} a {formatarDataIso(consumo.fim)}
+              </span>
+            )}
+          </>
+        ) : (
+          <>
+            <span className="indicador__indisponivel">Dados insuficientes</span>
+            <span className="indicador__periodo">{consumo.motivo}</span>
+          </>
+        )}
+      </Link>
+      <Link to={`/veiculos/${veiculoId}`} className="cartao indicador" aria-label="Custo por km">
+        <span className="texto-suave">Custo por km</span>
+        {km.disponivel && km.valor !== null ? (
+          <>
+            <span className="indicador__valor">{formatarDinheiro(km.valor)}</span>
+            <span className="texto-suave">{periodoCurtoDoCustoPorKm(km)}</span>
+            {km.fim && <span className="indicador__periodo">até {formatarDataIso(km.fim)}</span>}
+          </>
+        ) : (
+          <>
+            <span className="indicador__indisponivel">Dados insuficientes</span>
+            <span className="indicador__periodo">{km.motivo}</span>
+          </>
+        )}
+      </Link>
+    </div>
+  );
+}
+
+/** Alertas e indicadores do veículo em uso (os números vêm do backend num pedido só). */
+function PainelDoVeiculo({ veiculoId }: { veiculoId: number }) {
+  const [painel, setPainel] = useState<PainelInicio | null>(null);
+  const [falhou, setFalhou] = useState(false);
+
+  useEffect(() => {
+    let cancelado = false;
+    obterPainel(veiculoId)
+      .then((dados) => {
+        if (!cancelado) setPainel(dados);
+      })
+      .catch(() => {
+        if (!cancelado) setFalhou(true);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [veiculoId]);
+
+  return (
+    <>
+      <PrecisaDeAtencao veiculoId={veiculoId} contas={painel?.contas ?? null} tanque={painel?.tanque ?? null} />
+      {falhou && <p className="texto-suave">Não foi possível carregar os gastos e os indicadores.</p>}
+      {painel && (
+        <>
+          <GastosDoMesCartao painel={painel} />
+          <Indicadores veiculoId={veiculoId} painel={painel} />
+        </>
+      )}
+    </>
+  );
+}
+
+// Tela inicial (PDF, página 2): veículo em uso, quilometragem, atalhos,
+// "Precisa de atenção", gastos do mês, consumo médio e custo por km.
 export default function InicioPage() {
   const { usuario } = useAuth();
   const { carregando, erro, veiculos, emUso, recarregar } = useVeiculos();
@@ -162,7 +378,7 @@ export default function InicioPage() {
           <p className="texto-suave">
             {temInativos
               ? "Seus veículos estão inativos. Reative um deles ou cadastre outro para continuar."
-              : "Cadastre seu carro para acompanhar a quilometragem, as fotos e, nas próximas etapas, manutenções e gastos."}
+              : "Cadastre seu carro para acompanhar quilometragem, gastos, abastecimentos, manutenções e fotos."}
           </p>
         </section>
         <Link to="/veiculos/novo" className="botao botao--primario">Cadastrar veículo</Link>
@@ -201,18 +417,12 @@ export default function InicioPage() {
         </div>
       </section>
 
-      <PrecisaDeAtencao key={emUso.id} veiculoId={emUso.id} />
+      <Atalhos veiculoId={emUso.id} />
 
-      <section className="cartao">
-        <p className="cartao__titulo">Em construção</p>
-        <p className="texto-suave">
-          Os atalhos e os indicadores de gastos e consumo aparecem aqui quando esses módulos
-          ficarem prontos. Nada é mostrado com valores de exemplo.
-        </p>
-      </section>
+      <PainelDoVeiculo key={emUso.id} veiculoId={emUso.id} />
 
       <Link to={`/veiculos/${emUso.id}`} className="botao botao--secundario">
-        Ver dados e fotos do veículo
+        Ver dados, fotos e custo total do veículo
       </Link>
     </main>
   );

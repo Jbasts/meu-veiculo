@@ -29,6 +29,7 @@ const ORIGEM: Record<OrigemLeitura, string> = {
   manutencao: "Manutenção",
   diagnostico: "Diagnóstico",
   legado: "Leitura anterior ao histórico",
+  medicao_tanque: "Marcação do tanque",
 };
 
 function FormularioCorrecao({ veiculo, leitura, aoConcluir, aoCancelar }: {

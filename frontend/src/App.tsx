@@ -5,6 +5,10 @@ import { RotaProtegida, RotaSoParaVisitante } from "./components/Rotas";
 import { AuthProvider } from "./contexts/AuthContext";
 import { VeiculosProvider } from "./contexts/VeiculosContext";
 import AbastecimentoFormPage from "./pages/AbastecimentoFormPage";
+import MarcacaoTanqueFormPage from "./pages/MarcacaoTanqueFormPage";
+import AdminConvitePage from "./pages/AdminConvitePage";
+import AdminPage from "./pages/AdminPage";
+import AdminUsuarioPage from "./pages/AdminUsuarioPage";
 import CadastroPage from "./pages/CadastroPage";
 import ContaPage from "./pages/ContaPage";
 import DiagnosticoDetalhePage from "./pages/DiagnosticoDetalhePage";
@@ -16,6 +20,7 @@ import FotoNovaPage from "./pages/FotoNovaPage";
 import FinancasPage, { FinancasDoVeiculoPage } from "./pages/FinancasPage";
 import FotosPage from "./pages/FotosPage";
 import GastoFormPage from "./pages/GastoFormPage";
+import HistoricoPage, { HistoricoDoVeiculoPage } from "./pages/HistoricoPage";
 import InicioPage from "./pages/InicioPage";
 import LoginPage from "./pages/LoginPage";
 import MaisPage from "./pages/MaisPage";
@@ -67,6 +72,10 @@ export function RotasDoApp() {
           <Route path="/projetos" element={<ProjetosPage />} />
           <Route path="/veiculos/:veiculoId/projetos" element={<ProjetosDoVeiculoPage />} />
           <Route path="/veiculos/:veiculoId/projetos/:projetoId" element={<ProjetoDetalhePage />} />
+          <Route path="/historico" element={<HistoricoPage />} />
+          <Route path="/veiculos/:veiculoId/historico" element={<HistoricoDoVeiculoPage />} />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin/usuarios/:usuarioId" element={<AdminUsuarioPage />} />
           <Route path="/conta" element={<ContaPage />} />
           <Route path="/veiculos" element={<VeiculosPage />} />
           <Route path="/veiculos/:veiculoId" element={<VeiculoDetalhePage />} />
@@ -76,6 +85,7 @@ export function RotasDoApp() {
         </Route>
         {/* Formulários em tela cheia, sem a barra (como no PDF) */}
         <Route path="/veiculos/novo" element={<NovoVeiculoPage />} />
+        <Route path="/admin/usuarios/novo" element={<AdminConvitePage />} />
         <Route path="/veiculos/:veiculoId/editar" element={<EditarVeiculoPage />} />
         <Route path="/veiculos/:veiculoId/fotos/nova" element={<FotoNovaPage />} />
         <Route path="/veiculos/:veiculoId/manutencoes/nova" element={<ManutencaoFormPage />} />
@@ -86,6 +96,7 @@ export function RotasDoApp() {
         <Route path="/veiculos/:veiculoId/projetos/:projetoId/editar" element={<ProjetoFormPage />} />
         <Route path="/veiculos/:veiculoId/abastecimentos/novo" element={<AbastecimentoFormPage />} />
         <Route path="/veiculos/:veiculoId/abastecimentos/:abastecimentoId" element={<AbastecimentoFormPage />} />
+        <Route path="/veiculos/:veiculoId/tanque/marcacoes/:marcacaoId" element={<MarcacaoTanqueFormPage />} />
         <Route path="/veiculos/:veiculoId/gastos/:gastoId" element={<GastoFormPage />} />
         <Route path="/veiculos/:veiculoId/diagnosticos/:diagnosticoId/editar" element={<DiagnosticoFormPage />} />
       </Route>

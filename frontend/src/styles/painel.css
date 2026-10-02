@@ -1,0 +1,384 @@
+/* Etapa 9: Início (atalhos e indicadores), custo do veículo, Histórico e Administração. */
+
+/* ------------------------------------------------------------------ atalhos */
+
+.atalhos {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.atalhos__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 4px 12px;
+  color: var(--cor-texto);
+  font-weight: 500;
+  font-size: 0.95rem;
+  text-decoration: none;
+  background: var(--cor-cartao);
+  border: 1px solid var(--cor-borda);
+  border-radius: 16px;
+}
+
+.atalhos__item svg {
+  color: var(--cor-primaria);
+}
+
+.atalhos__item:focus-visible,
+.indicador:focus-visible,
+.eventos__link:focus-visible {
+  outline: 3px solid var(--cor-destaque);
+  outline-offset: 2px;
+}
+
+/* -------------------------------------------------------- cartões de custo */
+
+.custo p {
+  margin: 0;
+}
+
+.custo__topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.custo__valor {
+  margin: 6px 0 14px !important;
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 2.6rem;
+  line-height: 1.1;
+}
+
+.custo__unidade {
+  font-size: 1.3rem;
+  color: var(--cor-texto-suave);
+}
+
+.custo__indisponivel {
+  margin: 6px 0 4px !important;
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1.6rem;
+}
+
+.custo__nota {
+  margin-top: 10px !important;
+  font-size: 0.9rem;
+  color: var(--cor-texto-suave);
+}
+
+.custo__linhas {
+  margin-top: 12px;
+}
+
+.custo .lista-status__linha {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* Barra única dividida pelos grupos (PDF, páginas 2 e 15). */
+.barra-partes {
+  display: flex;
+  gap: 3px;
+  height: 10px;
+  margin-bottom: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.barra-partes__parte {
+  display: block;
+  flex-basis: 0;
+  min-width: 6px;
+}
+
+.legenda-partes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.legenda-partes__linha {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 0;
+}
+
+.legenda-partes__marca {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.legenda-partes__nome {
+  flex: 1;
+}
+
+.parte--aquisicao { background: var(--cor-petroleo-escuro); }
+.parte--combustivel { background: var(--cor-destaque); }
+.parte--manutencao { background: var(--cor-primaria); }
+.parte--projeto { background: #5d8a96; }
+.parte--seguro { background: #8e9da2; }
+.parte--documentacao { background: #c2cdd0; }
+.parte--seguro_documentacao { background: #8e9da2; }
+.parte--outros { background: #a9b6b9; }
+
+/* ---------------------------------------------- consumo médio e custo por km */
+
+.indicadores {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.indicador {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  color: var(--cor-texto);
+  text-decoration: none;
+}
+
+.indicador__valor {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 2rem;
+  line-height: 1.15;
+}
+
+.indicador__valor small {
+  font-size: 1.05rem;
+}
+
+.indicador__indisponivel {
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1.3rem;
+  line-height: 1.2;
+  margin-top: 4px;
+}
+
+.indicador__periodo {
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+}
+
+/* ---------------------------------------------------------------- histórico */
+
+.historico__veiculo {
+  margin: -6px 0 12px;
+}
+
+.historico__seletor {
+  max-width: 240px;
+  margin-top: 12px;
+}
+
+.historico__periodo {
+  margin: -8px 0 14px;
+  font-size: 0.9rem;
+}
+
+.historico__mes {
+  margin-bottom: 18px;
+}
+
+.historico__titulo-mes {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0 0 6px;
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1.4rem;
+}
+
+.historico__titulo-mes span:last-child {
+  font-family: var(--fonte-texto);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.historico__nota {
+  margin-top: 18px;
+  font-size: 0.9rem;
+}
+
+.eventos {
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Linha vertical que liga os ícones (data 32px + espaço 12px + metade do ícone 18px). */
+.eventos::before {
+  content: "";
+  position: absolute;
+  left: 61px;
+  top: 26px;
+  bottom: 26px;
+  width: 2px;
+  background: var(--cor-borda);
+}
+
+.eventos__icone {
+  position: relative;
+}
+
+.eventos__link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  color: var(--cor-texto);
+  text-decoration: none;
+}
+
+.eventos__data {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 32px;
+  flex-shrink: 0;
+  line-height: 1.1;
+}
+
+.eventos__data strong {
+  font-family: var(--fonte-titulo);
+  font-size: 1.35rem;
+}
+
+.eventos__data span {
+  font-size: 0.8rem;
+  color: var(--cor-texto-suave);
+}
+
+.eventos__icone {
+  width: 36px;
+  height: 36px;
+}
+
+.eventos__valor {
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.eventos__item .lista-simples__texto {
+  min-width: 0;
+}
+
+/* ------------------------------------------------------------ administração */
+
+.faixa-admin {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border-radius: var(--raio-cartao);
+  background: var(--cor-ok-fundo);
+  color: var(--cor-ok-texto);
+}
+
+.faixa-admin p {
+  margin: 0;
+}
+
+.faixa-admin svg {
+  flex-shrink: 0;
+  color: var(--cor-destaque);
+}
+
+.faixa-admin--escura {
+  background: var(--cor-petroleo-escuro);
+  color: var(--cor-texto-claro);
+}
+
+.faixa-admin__titulo {
+  font-weight: 600;
+  color: #fff;
+}
+
+.faixa-admin__dica {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.busca {
+  display: flex;
+  align-items: center;
+  margin-bottom: 14px;
+  background: var(--cor-cartao);
+  border: 1px solid #8e9da2;
+  border-radius: var(--raio-botao);
+}
+
+.busca__entrada {
+  flex: 1;
+  min-width: 0;
+  min-height: 50px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 1.05rem;
+  color: var(--cor-texto);
+  background: transparent;
+  border: none;
+  border-radius: var(--raio-botao);
+}
+
+.busca__botao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 50px;
+  color: var(--cor-texto-suave);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.busca:focus-within {
+  outline: 3px solid var(--cor-destaque);
+  outline-offset: 2px;
+}
+
+.busca__entrada:focus {
+  outline: none;
+}
+
+.perfil-usuario {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.perfil-usuario p {
+  margin: 0;
+}
+
+.perfil-usuario .avatar {
+  width: 72px;
+  height: 72px;
+  font-size: 1.5rem;
+}
+
+.menu__nota {
+  margin: 6px 4px 0;
+  font-size: 0.9rem;
+}

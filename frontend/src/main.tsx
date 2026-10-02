@@ -8,11 +8,13 @@ import "./styles/veiculos.css";
 import "./styles/manutencao.css";
 import "./styles/diagnostico.css";
 import "./styles/financas.css";
+import "./styles/painel.css";
 
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import App from "./App";
+import { registrarServiceWorker } from "./utils/pwa";
 
 const raiz = document.getElementById("raiz");
 if (!raiz) {
@@ -24,3 +26,5 @@ createRoot(raiz).render(
     <App />
   </StrictMode>,
 );
+
+registrarServiceWorker();

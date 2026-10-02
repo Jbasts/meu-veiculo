@@ -4,7 +4,8 @@ import { Link, useLocation } from "react-router";
 import Alerta from "../components/Alerta";
 import { Carregando, ErroComNovaTentativa } from "../components/EstadoDaTela";
 import { DialogoConfirmacao } from "../components/Formulario";
-import { IconeCamera, IconeLapis, IconeMaisSinal } from "../components/Icones";
+import { IconeCamera, IconeEscudo, IconeLapis, IconeMaisSinal } from "../components/Icones";
+import { CartaoCustoPorKm, CartaoCustoTotal } from "../components/PecasCusto";
 import { FotoProtegida, Placa } from "../components/PecasVeiculo";
 import TopoComVoltar from "../components/TopoComVoltar";
 import { useAuth } from "../contexts/AuthContext";
@@ -12,10 +13,12 @@ import { useVeiculos } from "../contexts/VeiculosContext";
 import { useVeiculoDaRota } from "../hooks/useVeiculoDaRota";
 import { ErroDaApi } from "../services/apiCliente";
 import { listarFotos } from "../services/fotoService";
+import { obterCusto } from "../services/painelService";
 import { inativarVeiculo, reativarVeiculo } from "../services/veiculoService";
+import type { CustoVeiculo } from "../types/painel";
 import { rotuloCombustivel, type Foto } from "../types/veiculo";
 import { formatarDataIso, formatarMesAnoCurto } from "../utils/datas";
-import { formatarDinheiro, formatarKm, formatarPlaca } from "../utils/formatos";
+import { formatarDecimal, formatarDinheiro, formatarKm, formatarPlaca } from "../utils/formatos";
 
 function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
@@ -26,9 +29,35 @@ function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
   );
 }
 
-// "Meu veículo" (PDF, página 15). Os cartões "Quanto esse carro já me custou"
-// e "Custo por quilômetro" dependem de gastos, abastecimentos e manutenções:
-// entram na etapa 9, calculados com registros reais.
+/** "Quanto esse carro já me custou" e "Custo por quilômetro", calculados no backend. */
+function CustoDoVeiculo({ veiculoId }: { veiculoId: number }) {
+  const [custo, setCusto] = useState<CustoVeiculo | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+
+  const carregar = useCallback(async () => {
+    try {
+      setCusto(await obterCusto(veiculoId));
+      setErro(null);
+    } catch (falha) {
+      setErro(falha instanceof ErroDaApi ? falha.message : "Não foi possível calcular o custo.");
+    }
+  }, [veiculoId]);
+
+  useEffect(() => {
+    void carregar();
+  }, [carregar]);
+
+  if (erro) return <ErroComNovaTentativa mensagem={erro} aoTentar={() => void carregar()} />;
+  if (!custo) return <Carregando texto="Calculando o custo…" />;
+  return (
+    <>
+      <CartaoCustoTotal custo={custo.custo_total} />
+      <CartaoCustoPorKm custo={custo.custo_por_km} />
+    </>
+  );
+}
+
+// "Meu veículo" (PDF, página 15): capa, fotos, custo total, custo por km e dados.
 export default function VeiculoDetalhePage() {
   const { id, veiculo, setVeiculo, carregando, erro, recarregar } = useVeiculoDaRota();
   const { usuario } = useAuth();
@@ -87,7 +116,7 @@ export default function VeiculoDetalhePage() {
 
   return (
     <main className="conteudo conteudo--topo">
-      <TopoComVoltar titulo={ehDono ? "Meu veículo" : "Veículo"} voltarPara="/veiculos" acao={
+      <TopoComVoltar titulo={ehDono ? "Meu veículo" : "Veículo"} voltarPara={ehDono ? "/veiculos" : "/admin"} acao={
         veiculo.ativo ? (
           <Link to={`${base}/editar`} className="botao-icone" aria-label="Editar veículo">
             <IconeLapis />
@@ -97,9 +126,21 @@ export default function VeiculoDetalhePage() {
       {estado?.mensagem && <Alerta tipo="sucesso">{estado.mensagem}</Alerta>}
       {estado?.aviso && <Alerta tipo="erro">{estado.aviso}</Alerta>}
       {erroAcao && <Alerta tipo="erro">{erroAcao}</Alerta>}
+      {!ehDono && (
+        <section className="faixa-admin" aria-label="Visão de administrador">
+          <IconeEscudo />
+          <p>Você está vendo, como administrador, o veículo de outra conta.</p>
+        </section>
+      )}
       {!veiculo.ativo && (
         <Alerta tipo="info">
           Veículo inativo: o histórico pode ser consultado, mas não alterado.
+        </Alerta>
+      )}
+      {veiculo.ativo && veiculo.tanque_pendente && (
+        <Alerta tipo="info">
+          Falta o tamanho do tanque no cadastro.{" "}
+          <Link to={`${base}/editar`} className="link">Informar agora</Link>
         </Alerta>
       )}
 
@@ -160,6 +201,11 @@ export default function VeiculoDetalhePage() {
         {totalFotos === 0 && !veiculo.ativo && <p className="texto-suave">Nenhuma foto.</p>}
       </div>
 
+      <CustoDoVeiculo veiculoId={veiculo.id} />
+
+      <Link to={`${base}/historico`} className="botao botao--secundario botao--abaixo">
+        Histórico deste veículo
+      </Link>
       <Link to={`${base}/manutencoes`} className="botao botao--secundario botao--abaixo">
         Manutenções e planos deste veículo
       </Link>
@@ -173,6 +219,9 @@ export default function VeiculoDetalhePage() {
         <Linha rotulo="Placa" valor={formatarPlaca(veiculo.placa)} />
         {veiculo.cor && <Linha rotulo="Cor" valor={veiculo.cor} />}
         <Linha rotulo="Combustível" valor={rotuloCombustivel(veiculo.tipo_combustivel)} />
+        {veiculo.capacidade_tanque && (
+          <Linha rotulo="Tanque" valor={`${formatarDecimal(veiculo.capacidade_tanque)} litros`} />
+        )}
         <Linha rotulo="Quilometragem atual" valor={formatarKm(veiculo.quilometragem)} />
         <Linha rotulo="Comprado em"
           valor={veiculo.data_aquisicao ? formatarMesAnoCurto(veiculo.data_aquisicao) : "Não informado"} />

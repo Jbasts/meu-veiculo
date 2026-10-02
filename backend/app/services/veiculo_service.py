@@ -9,6 +9,8 @@
   continua consultável. Inativo fica somente para leitura até ser reativado.
 - A quilometragem só entra no cadastro. Depois, muda por leituras
   (quilometragem_service.py), nunca pela edição do veículo.
+- O tamanho do tanque é obrigatório no cadastro e na edição (menos no
+  elétrico, que não tem tanque); veja services/tanque.py.
 """
 
 import re
@@ -24,6 +26,7 @@ from app.services import calendario
 from app.services.acesso_veiculo import AcessoVeiculo
 from app.services.calendario import numero_br
 from app.services.erros import Conflito, DadosInvalidos
+from app.services.tanque import validar_capacidade
 
 KM_MAXIMO = 9_999_999
 VALOR_MAXIMO = Decimal("9999999999.99")
@@ -146,6 +149,7 @@ class VeiculoService:
         if combustivel not in COMBUSTIVEIS:
             raise DadosInvalidos("Escolha o combustível.", campo="tipo_combustivel")
         limpos["tipo_combustivel"] = combustivel
+        limpos["capacidade_tanque"] = validar_capacidade(dados.get("capacidade_tanque"), combustivel)
 
         data_aquisicao = dados.get("data_aquisicao")
         if data_aquisicao is not None and data_aquisicao > hoje:

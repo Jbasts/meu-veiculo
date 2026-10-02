@@ -1,26 +1,31 @@
 // Aba "Combustível" das Finanças (PDF, página 11): consumo médio por
-// combustível, "Etanol ou gasolina?" e a lista de abastecimentos.
-// Todos os números vêm do backend; a tela só formata.
+// combustível, "Etanol ou gasolina?", consumo por mês, marcações do tanque e
+// a lista de abastecimentos. Todos os números vêm do backend; a tela só formata.
 
 import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { Link } from "react-router";
 
 import { ErroDaApi } from "../services/apiCliente";
-import { listarAbastecimentos, obterResumoCombustivel } from "../services/abastecimentoService";
+import { listarAbastecimentos, listarMarcacoes, obterResumoCombustivel } from "../services/abastecimentoService";
 import {
   nomeDoCombustivel,
   ROTULO_COMBUSTIVEL,
+  rotuloDoNivel,
   unidade,
   type Abastecimento,
   type Comparacao,
+  type MarcacaoTanque,
+  type MediaConsumo,
   type ResumoCombustivel,
+  type SituacaoConsumo,
 } from "../types/abastecimento";
 import type { Veiculo } from "../types/veiculo";
-import { formatarDataIso } from "../utils/datas";
-import { formatarDecimal, formatarDinheiro, lerDecimal3 } from "../utils/formatos";
+import { formatarDataIso, nomeDoMes } from "../utils/datas";
+import { arredondarUmaCasa, formatarDecimal, formatarDinheiro, formatarKm, lerDecimal3 } from "../utils/formatos";
 import CampoTexto from "./CampoTexto";
 import { Carregando, ErroComNovaTentativa } from "./EstadoDaTela";
-import { IconeBomba, IconeCheck } from "./Icones";
+import { IconeBomba, IconeCheck, IconeSeta } from "./Icones";
+import { faixaDoMarcador, textoDoKmPorLitro } from "./PecasTanque";
 
 const POR_PAGINA = 30;
 
@@ -36,20 +41,67 @@ function preco(valor: string): string {
   return `R$ ${formatarDecimal(valor, 2)}`;
 }
 
-/** O que aparece à direita de cada abastecimento. */
-function textoDoConsumo(a: Abastecimento): { texto: string; destaque: boolean } {
-  switch (a.consumo.tipo) {
+/** O que aparece à direita de cada abastecimento (ou marcação). */
+function textoDoConsumo(consumo: SituacaoConsumo, combustivel: string): { texto: string; destaque: boolean } {
+  switch (consumo.tipo) {
     case "consumo":
-      return { texto: `${formatarDecimal(a.consumo.km_por_litro!, 1)} ${unidade(a.combustivel).consumo}`, destaque: true };
+      return { texto: textoDoKmPorLitro(consumo, combustivel), destaque: true };
     case "parcial":
       return { texto: "Tanque parcial", destaque: false };
     case "primeiro_cheio":
       return { texto: "Primeiro tanque cheio", destaque: false };
+    case "primeiro_nivel":
+      return { texto: "Primeiro nível marcado", destaque: false };
+    case "trecho_curto":
+      return { texto: "Trecho curto", destaque: false };
     case "fora_do_calculo":
       return { texto: "Fora do cálculo", destaque: false };
+    case "sem_tanque":
+      return { texto: "Falta o tamanho do tanque", destaque: false };
     default:
       return { texto: "Sem consumo", destaque: false };
   }
+}
+
+/** "≈ 10,4" com a faixa, quando alguma ponta veio do marcador. */
+function ValorDaMedia({ m }: { m: MediaConsumo }) {
+  return (
+    <>
+      <p className="cartao-consumo__valor">
+        {m.estimada && "≈ "}{formatarDecimal(m.km_por_litro, 1)} <span>{unidade(m.combustivel).consumo}</span>
+      </p>
+      {m.estimada && <p className="cartao-consumo__faixa">{faixaDoMarcador(m.km_por_litro_minimo, m.km_por_litro_maximo)}</p>}
+    </>
+  );
+}
+
+/** Tamanho do tanque que falta no cadastro e a marcação do início do mês. */
+function AvisosDoTanque({ veiculo, resumo }: { veiculo: Veiculo; resumo: ResumoCombustivel }) {
+  if (!veiculo.ativo) return null;
+  return (
+    <>
+      {resumo.tanque_pendente && (
+        <section className="cartao" aria-label="Tamanho do tanque">
+          <p className="cartao__titulo">Falta o tamanho do tanque</p>
+          <p className="texto-suave">
+            Com ele, o app confere se os litros cabem no tanque e calcula o consumo pelo nível do marcador.
+          </p>
+          <Link to={`/veiculos/${veiculo.id}/editar`} className="botao botao--secundario">Informar o tamanho do tanque</Link>
+        </section>
+      )}
+      {resumo.marcacao_do_mes_pendente && (
+        <section className="cartao" aria-label="Marcação do mês">
+          <p className="cartao__titulo">Marque o km e o nível do tanque deste mês</p>
+          <p className="texto-suave">
+            Uma vez no início do mês: com ela, o consumo do mês fecha certinho, mesmo sem encher o tanque.
+          </p>
+          <Link to={`/veiculos/${veiculo.id}/tanque/marcacoes/nova`} className="botao botao--secundario">
+            Marcar km e nível
+          </Link>
+        </section>
+      )}
+    </>
+  );
 }
 
 function Medias({ resumo }: { resumo: ResumoCombustivel }) {
@@ -59,7 +111,7 @@ function Medias({ resumo }: { resumo: ResumoCombustivel }) {
         <p className="cartao-consumo__vazio">Ainda não há consumo calculado.</p>
         <p className="cartao-consumo__nota">
           O consumo aparece depois de dois abastecimentos de tanque cheio (ou duas cargas completas)
-          do mesmo combustível.
+          do mesmo combustível, ou entre dois registros com o nível do marcador.
         </p>
       </section>
     );
@@ -70,13 +122,119 @@ function Medias({ resumo }: { resumo: ResumoCombustivel }) {
         {resumo.medias.map((m) => (
           <div key={m.combustivel} className="cartao-consumo__media">
             <p className="cartao-consumo__rotulo">{ROTULO_COMBUSTIVEL[m.combustivel]}</p>
-            <p className="cartao-consumo__valor">
-              {formatarDecimal(m.km_por_litro, 1)} <span>{unidade(m.combustivel).consumo}</span>
-            </p>
+            <ValorDaMedia m={m} />
           </div>
         ))}
       </div>
-      <p className="cartao-consumo__nota">Média calculada entre abastecimentos de tanque cheio.</p>
+      <p className="cartao-consumo__nota">
+        {resumo.medias.some((m) => m.estimada)
+          ? "Média entre tanques cheios e níveis do marcador. O tanque cheio é exato; o marcador tem margem, "
+            + "que fica menor quanto mais quilômetros você registra."
+          : "Média calculada entre abastecimentos de tanque cheio."}
+      </p>
+    </section>
+  );
+}
+
+/** "Consumo por mês": cada trecho conta no mês em que começou. */
+function ConsumoPorMes({ resumo }: { resumo: ResumoCombustivel }) {
+  if (resumo.meses.length === 0) return null;
+  const varios = new Set(resumo.meses.map((m) => m.combustivel)).size > 1;
+  return (
+    <section aria-label="Consumo por mês">
+      <h2 className="rotulo-secao">Consumo por mês</h2>
+      <ul className="cartao lista-simples">
+        {resumo.meses.map((m) => (
+          <li key={`${m.ano}-${m.mes}-${m.combustivel}`} className="lista-simples__item consumo-mes">
+            <span className="lista-simples__texto">
+              <span className="lista-simples__titulo">
+                {nomeDoMes({ ano: m.ano, mes: m.mes })}{varios ? `, ${ROTULO_COMBUSTIVEL[m.combustivel].toLowerCase()}` : ""}
+              </span>
+              <span className="texto-suave">
+                {formatarKm(m.distancia)} com {formatarDecimal(arredondarUmaCasa(m.quantidade))} {unidade(m.combustivel).curta}
+              </span>
+            </span>
+            <span className="consumo-mes__valor">
+              <strong className="consumo-destaque">
+                {m.estimada && "≈ "}{formatarDecimal(m.km_por_litro, 1)} {unidade(m.combustivel).consumo}
+              </strong>
+              {m.estimada && m.km_por_litro_minimo && m.km_por_litro_maximo && (
+                <span className="texto-suave">
+                  {" "}{formatarDecimal(m.km_por_litro_minimo, 1)} a {formatarDecimal(m.km_por_litro_maximo, 1)}
+                </span>
+              )}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** Marcações do tanque (km e nível sem abastecer), da mais recente para a mais antiga. */
+function ListaDeMarcacoes({ veiculo, resumo }: { veiculo: Veiculo; resumo: ResumoCombustivel }) {
+  const [itens, setItens] = useState<MarcacaoTanque[]>([]);
+  const [total, setTotal] = useState<number | null>(null);
+  const [pagina, setPagina] = useState(0);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
+
+  const carregar = useCallback(async (numero: number) => {
+    setCarregando(true);
+    try {
+      const r = await listarMarcacoes(veiculo.id, numero, POR_PAGINA);
+      setItens((atuais) => (numero === 1 ? r.itens : [...atuais, ...r.itens]));
+      setTotal(r.total);
+      setPagina(numero);
+      setErro(null);
+    } catch (falha) {
+      setErro(mensagemDe(falha, "Não foi possível carregar as marcações do tanque."));
+    } finally {
+      setCarregando(false);
+    }
+  }, [veiculo.id]);
+
+  useEffect(() => {
+    void carregar(1);
+  }, [carregar]);
+
+  if (erro) return <ErroComNovaTentativa mensagem={erro} aoTentar={() => void carregar(Math.max(1, pagina))} />;
+  if (total === null) return null;
+  const podeMarcar = veiculo.ativo && resumo.capacidade_tanque !== null;
+  if (total === 0 && (!podeMarcar || resumo.marcacao_do_mes_pendente)) return null;
+  return (
+    <section aria-label="Marcações do tanque">
+      <h2 className="rotulo-secao">Marcações do tanque</h2>
+      {total > 0 && (
+        <ul className="cartao lista-simples">
+          {itens.map((m) => {
+            const consumo = textoDoConsumo(m.consumo, "gasolina");
+            return (
+              <li key={m.id}>
+                <Link to={`/veiculos/${veiculo.id}/tanque/marcacoes/${m.id}`} className="lista-simples__item">
+                  <span className="lista-simples__texto">
+                    <span className="lista-simples__titulo">Marcador em {rotuloDoNivel(m.nivel)}</span>
+                    <span className="texto-suave">{formatarDataIso(m.data)}, {formatarKm(m.quilometragem)}</span>
+                  </span>
+                  <span className={consumo.destaque ? "consumo-destaque" : "texto-suave"}>{consumo.texto}</span>
+                  <IconeSeta tamanho={20} />
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {itens.length < total && (
+        <button type="button" className="botao botao--secundario" disabled={carregando}
+          onClick={() => void carregar(pagina + 1)}>
+          {carregando ? "Carregando…" : `Carregar mais (${total - itens.length} restantes)`}
+        </button>
+      )}
+      {podeMarcar && !resumo.marcacao_do_mes_pendente && (
+        <Link to={`/veiculos/${veiculo.id}/tanque/marcacoes/nova`} className="botao botao--secundario botao--espaco">
+          Marcar km e nível
+        </Link>
+      )}
     </section>
   );
 }
@@ -217,7 +375,7 @@ function ListaDeAbastecimentos({ veiculo }: { veiculo: Veiculo }) {
       <h2 className="rotulo-secao">Abastecimentos</h2>
       <ul className="cartao lista-simples">
         {itens.map((a) => {
-          const consumo = textoDoConsumo(a);
+          const consumo = textoDoConsumo(a.consumo, a.combustivel);
           const u = unidade(a.combustivel);
           return (
             <li key={a.id}>
@@ -280,11 +438,14 @@ export default function AbaCombustivel({ veiculo }: { veiculo: Veiculo }) {
   if (!resumo) return <Carregando />;
   return (
     <>
+      <AvisosDoTanque veiculo={veiculo} resumo={resumo} />
       <Medias resumo={resumo} />
       {resumo.comparacao && (
         <CartaoComparacao comparacao={resumo.comparacao} simulando={simulando} erroSimulacao={erroSimulacao}
           aoSimular={(precos) => void carregar(precos ?? undefined)} />
       )}
+      <ConsumoPorMes resumo={resumo} />
+      <ListaDeMarcacoes veiculo={veiculo} resumo={resumo} />
       <ListaDeAbastecimentos veiculo={veiculo} />
     </>
   );

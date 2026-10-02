@@ -8,7 +8,7 @@ const ITENS = [
   { para: "/manutencao", rotulo: "Manutenção", Icone: IconeManutencao, prefixos: ["/manutencao"] },
   { para: "/diagnostico", rotulo: "Diagnóstico", Icone: IconeDiagnostico, prefixos: ["/diagnostico"] },
   { para: "/financas", rotulo: "Finanças", Icone: IconeFinancas, prefixos: ["/financas"] },
-  { para: "/mais", rotulo: "Mais", Icone: IconeMais, prefixos: ["/mais", "/veiculos", "/conta", "/projetos"] },
+  { para: "/mais", rotulo: "Mais", Icone: IconeMais, prefixos: ["/mais", "/veiculos", "/conta", "/projetos", "/historico", "/admin"] },
 ];
 
 // Navegação inferior do PDF: Início, Manutenção, Diagnóstico, Finanças e Mais.

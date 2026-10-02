@@ -91,10 +91,14 @@ def test_admin_desativado_perde_o_acesso(cliente, banco_migrado):
     assert rafael.get("/api/exemplo/admin").status_code == 401
 
 
-def test_nao_existe_endpoint_para_virar_admin():
+def test_nao_existe_endpoint_publico_para_virar_admin():
+    """Mudar perfil pela API só existe em /api/admin/..., para quem JÁ é admin (cada
+    endereço de lá é conferido em tests/test_admin_api.py). O primeiro admin vem do
+    terminal (gerenciar.py promover-admin)."""
     enderecos = app_real.openapi()["paths"].keys()
     assert "/api/auth/cadastro" in enderecos
-    assert not [e for e in enderecos if "admin" in e or "perfil" in e or "promover" in e]
+    fora_da_admin = [e for e in enderecos if not e.startswith("/api/admin/")]
+    assert not [e for e in fora_da_admin if "admin" in e or "perfil" in e or "promover" in e]
 
 
 # ------------------------------------------------- primeiro admin (terminal)

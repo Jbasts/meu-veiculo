@@ -1,4 +1,4 @@
-"""Tabela abastecimento (SQL original + migrations 0008, 0009 e 0010).
+"""Tabela abastecimento (SQL original + migrations 0008, 0009, 0010 e 0012).
 
 combustivel: gasolina, etanol, diesel, gnv ou eletrica (recarga).
 litros: a quantidade abastecida, na unidade do combustível (litros; m³ no
@@ -8,13 +8,15 @@ tipo: um dos tipos do combustível (TIPOS_DO_COMBUSTIVEL, 0010); vazio nos
 valor_total: litros × valor_litro arredondado meio para cima, ou o valor do
     cupom quando difere no máximo R$ 50,00 (CHECK da 0009).
 tanque_cheio: o consumo é calculado entre dois abastecimentos de tanque cheio.
+nivel_antes: o marcador antes de abastecer, em oitavos do tanque (0012);
+    opcional e só para combustível líquido (COMBUSTIVEIS_COM_MARCADOR).
 A quilometragem vira leitura do hodômetro (migration 0003).
 """
 
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, func, text
+from sqlalchemy import DateTime, ForeignKey, Numeric, SmallInteger, String, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.entities.base import Base
@@ -25,6 +27,8 @@ DIESEL = "diesel"
 GNV = "gnv"
 ELETRICA = "eletrica"  # recarga; "eletrica" cabe nos 10 caracteres da coluna
 COMBUSTIVEIS = (GASOLINA, ETANOL, DIESEL, GNV, ELETRICA)
+# Os que vão para o tanque de combustível líquido (o do marcador e da capacidade).
+COMBUSTIVEIS_COM_MARCADOR = (GASOLINA, ETANOL, DIESEL)
 
 # Tabela da Paula (01/10/2026): tipos de cada combustível. GNV não tem tipo.
 TIPOS_DO_COMBUSTIVEL: dict[str, tuple[str, ...]] = {
@@ -60,5 +64,6 @@ class Abastecimento(Base):
     valor_litro: Mapped[Decimal] = mapped_column(Numeric(6, 3))
     valor_total: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     tanque_cheio: Mapped[bool] = mapped_column(server_default=text("true"))
+    nivel_antes: Mapped[int | None] = mapped_column(SmallInteger)
     posto: Mapped[str | None] = mapped_column(String(80))
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

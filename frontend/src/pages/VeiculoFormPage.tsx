@@ -19,8 +19,10 @@ import { COMBUSTIVEIS, type Combustivel, type DadosVeiculo, type Veiculo } from 
 import { hojeIso } from "../utils/datas";
 import {
   dinheiroParaCampo,
+  formatarDecimal,
   formatarInteiro,
   formatarPlaca,
+  lerDecimal3,
   lerDinheiro,
   lerInteiro,
   mascararInteiro,
@@ -41,11 +43,12 @@ interface Campos {
   dataAquisicao: string;
   valorAquisicao: string;
   kmAquisicao: string;
+  tanque: string;
 }
 
 const VAZIO: Campos = {
   marca: "", modelo: "", ano: "", placa: "", versao: "", cor: "", combustivel: "flex",
-  quilometragem: "", dataAquisicao: "", valorAquisicao: "", kmAquisicao: "",
+  quilometragem: "", dataAquisicao: "", valorAquisicao: "", kmAquisicao: "", tanque: "",
 };
 
 function camposDe(veiculo: Veiculo): Campos {
@@ -61,6 +64,7 @@ function camposDe(veiculo: Veiculo): Campos {
     dataAquisicao: veiculo.data_aquisicao ?? "",
     valorAquisicao: dinheiroParaCampo(veiculo.valor_aquisicao),
     kmAquisicao: veiculo.km_aquisicao === null ? "" : formatarInteiro(veiculo.km_aquisicao),
+    tanque: veiculo.capacidade_tanque === null ? "" : formatarDecimal(veiculo.capacidade_tanque),
   };
 }
 
@@ -115,6 +119,9 @@ function Formulario({ veiculo }: { veiculo: Veiculo | null }) {
     const kmCompra = lerInteiro(campos.kmAquisicao);
     const valor = lerDinheiro(campos.valorAquisicao);
     const kmAtual = edicao ? veiculo.quilometragem : km;
+    // Elétrico não tem tanque; os outros precisam do tamanho (em litros, até 1 casa).
+    const temTanque = campos.combustivel !== "eletrico";
+    const tanque = temTanque ? lerDecimal3(campos.tanque) : null;
     const placaInalterada = edicao && normalizarPlaca(campos.placa) === veiculo.placa;
     const erros = soErros({
       marca: erroObrigatorio(campos.marca, "Informe a marca."),
@@ -130,8 +137,12 @@ function Formulario({ veiculo }: { veiculo: Veiculo | null }) {
       valor_aquisicao: valor === undefined ? "Valor inválido. Exemplo: 65.000,00." : null,
       km_aquisicao: kmCompra !== null && kmAtual !== null && kmCompra > kmAtual
         ? "A quilometragem na compra não pode ser maior que a atual." : null,
+      capacidade_tanque: !temTanque ? null
+        : tanque === null ? "Informe o tamanho do tanque em litros (está no manual do veículo)."
+          : tanque === undefined || !/0{2}$/.test(tanque) ? "Tamanho inválido. Exemplo: 47 ou 47,5."
+            : Number(tanque) <= 0 ? "O tamanho do tanque precisa ser maior que zero." : null,
     });
-    if (Object.keys(erros).length || ano === null || valor === undefined) return { erros };
+    if (Object.keys(erros).length || ano === null || valor === undefined || tanque === undefined) return { erros };
     return {
       erros,
       km: km ?? undefined,
@@ -146,6 +157,7 @@ function Formulario({ veiculo }: { veiculo: Veiculo | null }) {
         data_aquisicao: campos.dataAquisicao || null,
         valor_aquisicao: valor,
         km_aquisicao: kmCompra,
+        capacidade_tanque: tanque,
       },
     };
   }
@@ -239,6 +251,18 @@ function Formulario({ veiculo }: { veiculo: Veiculo | null }) {
 
           <GrupoOpcoes rotulo="Combustível" opcoes={COMBUSTIVEIS} valor={campos.combustivel}
             aoMudar={(valor) => mudar("combustivel", valor)} erro={errosCampo.tipo_combustivel} />
+
+          {campos.combustivel !== "eletrico" && (
+            <>
+              {edicao && veiculo.tanque_pendente && (
+                <Alerta tipo="info">Informe o tamanho do tanque: ele passou a ser obrigatório.</Alerta>
+              )}
+              <CampoTexto rotulo="Tamanho do tanque (litros)" inputMode="decimal" placeholder="47"
+                value={campos.tanque} maxLength={7} onChange={(e) => mudar("tanque", e.target.value)}
+                erro={errosCampo.capacidade_tanque}
+                dica="Está no manual. Serve para conferir os litros ao abastecer e usar o nível do marcador." />
+            </>
+          )}
 
           {edicao ? (
             <div className="caixa-info">

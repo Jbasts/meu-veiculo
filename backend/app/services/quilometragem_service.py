@@ -43,7 +43,7 @@ from app.services.veiculo_service import validar_quilometragem
 
 TAMANHO_MAXIMO_MOTIVO = 200
 NOME_DA_ORIGEM = {"abastecimento": "abastecimento", "manutencao": "manutenção",
-                  "diagnostico": "diagnóstico"}
+                  "diagnostico": "diagnóstico", "medicao_tanque": "marcação do tanque"}
 
 
 class Transacional(Protocol):

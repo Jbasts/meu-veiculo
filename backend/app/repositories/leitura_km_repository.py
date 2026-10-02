@@ -84,6 +84,22 @@ class LeituraKmRepository:
             .order_by(LeituraKm.data_leitura.desc().nulls_last(), LeituraKm.id.desc()).limit(3)
         ))
 
+    def primeira_e_ultima_com_data(self, veiculo_id: int) -> tuple[LeituraKm, LeituraKm] | None:
+        """A leitura válida mais antiga e a mais recente que têm data (para o
+        custo por km). Leituras sem data (herdadas) não entram: não dá para
+        saber a que período pertencem."""
+        base = select(LeituraKm).where(LeituraKm.veiculo_id == veiculo_id,
+                                       LeituraKm.anulada_em.is_(None),
+                                       LeituraKm.data_leitura.is_not(None))
+        primeira = self._sessao.scalars(base.order_by(
+            LeituraKm.data_leitura, LeituraKm.quilometragem, LeituraKm.id).limit(1)).first()
+        if primeira is None:
+            return None
+        ultima = self._sessao.scalars(base.order_by(
+            LeituraKm.data_leitura.desc(), LeituraKm.quilometragem.desc(),
+            LeituraKm.id.desc()).limit(1)).first()
+        return primeira, ultima
+
     def criar(self, veiculo_id: int, quilometragem: int, data_leitura: date | None,
               origem: str, corrige_id: int | None = None) -> LeituraKm:
         leitura = LeituraKm(veiculo_id=veiculo_id, quilometragem=quilometragem,

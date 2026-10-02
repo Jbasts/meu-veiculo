@@ -1,11 +1,11 @@
 """Acesso à tabela usuario."""
 
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session
 
 from app.entities.usuario import PERFIL_PADRAO, Usuario
-from app.repositories.erros import EmailJaCadastrado
+from app.repositories.erros import EmailJaCadastrado, UltimoAdministrador, dica_do_erro
 
 INDICE_EMAIL_UNICO = "usuario_email_unico"
 
@@ -49,3 +49,24 @@ class UsuarioRepository:
     def definir_perfil(self, usuario: Usuario, perfil: str) -> None:
         usuario.perfil = perfil
         self._sessao.flush()
+
+    def bloquear(self, usuario_id: int) -> Usuario | None:
+        """Busca e segura a linha até o fim da transação (alterações do admin em sequência)."""
+        return self._sessao.scalar(
+            select(Usuario).where(Usuario.id == usuario_id).with_for_update()
+            .execution_options(populate_existing=True)
+        )
+
+    def alterar_acesso(self, usuario: Usuario, perfil: str, ativo: bool) -> None:
+        """Perfil e conta ativa. O banco recusa deixar o sistema sem admin ativo."""
+        usuario.perfil = perfil
+        usuario.ativo = ativo
+        try:
+            # SAVEPOINT: se o trigger do último admin recusar, só isto é desfeito.
+            with self._sessao.begin_nested():
+                self._sessao.flush()
+        except DBAPIError as erro:
+            if dica_do_erro(erro) == "ultimo_admin":
+                self._sessao.refresh(usuario)
+                raise UltimoAdministrador() from None
+            raise

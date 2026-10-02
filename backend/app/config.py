@@ -55,6 +55,8 @@ class Configuracoes(BaseSettings):
 
     # Validade do link de recuperação de senha.
     recuperacao_minutos: int = Field(default=60, ge=5, le=24 * 60)
+    # Validade do convite (conta criada pelo administrador; a pessoa define a senha pelo link).
+    convite_dias: int = Field(default=7, ge=1, le=30)
 
     # E-mail. "arquivo" grava cada mensagem em EMAIL_PASTA (desenvolvimento);
     # "smtp" envia de verdade pelo servidor configurado abaixo.

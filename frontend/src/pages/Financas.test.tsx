@@ -14,7 +14,7 @@ const CIVIC: Veiculo = {
   placa: "ABC1234", cor: null, tipo_combustivel: "flex", quilometragem: 85000,
   data_leitura_km: "2026-09-20", km_aquisicao: 22000, data_aquisicao: "2022-03-15",
   valor_aquisicao: "65000.00", ativo: true, criado_em: "2026-09-01T10:00:00-03:00",
-  em_uso: true, foto_capa_id: null,
+  em_uso: true, foto_capa_id: null, capacidade_tanque: "56.0", tanque_pendente: false,
 };
 
 const HOJE = hojeIso();

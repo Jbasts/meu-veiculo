@@ -1,6 +1,7 @@
 """Tabela usuario (SQL original, com o e-mail normalizado pela migration 0002
 e o veículo em uso da migration 0003)."""
 
+from dataclasses import dataclass
 from datetime import datetime
 
 from sqlalchemy import DateTime, String, func, text
@@ -31,3 +32,18 @@ class Usuario(Base):
     @property
     def eh_admin(self) -> bool:
         return self.perfil == PERFIL_ADMIN
+
+
+@dataclass(frozen=True)
+class UsuarioResumo:
+    """Linha da view vw_usuario_resumo (sem senha_hash) para a administração."""
+
+    id: int
+    nome: str
+    email: str
+    perfil: str
+    ativo: bool
+    ultimo_acesso: datetime | None
+    criado_em: datetime
+    veiculos_ativos: int
+    veiculos: int

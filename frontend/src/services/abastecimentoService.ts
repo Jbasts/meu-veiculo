@@ -1,6 +1,12 @@
 // Chamadas à API de abastecimentos e combustível (/api/veiculos/{id}/abastecimentos e /combustivel).
 
-import type { Abastecimento, DadosAbastecimento, ResumoCombustivel } from "../types/abastecimento";
+import type {
+  Abastecimento,
+  DadosAbastecimento,
+  DadosMarcacao,
+  MarcacaoTanque,
+  ResumoCombustivel,
+} from "../types/abastecimento";
 import type { Pagina } from "../types/veiculo";
 import { chamarApi } from "./apiCliente";
 
@@ -32,4 +38,28 @@ export function editarAbastecimento(veiculoId: number, id: number,
 
 export async function apagarAbastecimento(veiculoId: number, id: number): Promise<void> {
   await chamarApi<null>("DELETE", `/veiculos/${veiculoId}/abastecimentos/${id}`);
+}
+
+// Marcações do tanque (/api/veiculos/{id}/tanque/marcacoes): km e nível sem abastecer.
+
+export function listarMarcacoes(veiculoId: number, pagina = 1,
+  porPagina = 30): Promise<Pagina<MarcacaoTanque>> {
+  return chamarApi<Pagina<MarcacaoTanque>>("GET",
+    `/veiculos/${veiculoId}/tanque/marcacoes?pagina=${pagina}&por_pagina=${porPagina}`);
+}
+
+export function obterMarcacao(veiculoId: number, id: number): Promise<MarcacaoTanque> {
+  return chamarApi<MarcacaoTanque>("GET", `/veiculos/${veiculoId}/tanque/marcacoes/${id}`);
+}
+
+export function criarMarcacao(veiculoId: number, dados: DadosMarcacao): Promise<MarcacaoTanque> {
+  return chamarApi<MarcacaoTanque>("POST", `/veiculos/${veiculoId}/tanque/marcacoes`, dados);
+}
+
+export function editarMarcacao(veiculoId: number, id: number, dados: DadosMarcacao): Promise<MarcacaoTanque> {
+  return chamarApi<MarcacaoTanque>("PUT", `/veiculos/${veiculoId}/tanque/marcacoes/${id}`, dados);
+}
+
+export async function apagarMarcacao(veiculoId: number, id: number): Promise<void> {
+  await chamarApi<null>("DELETE", `/veiculos/${veiculoId}/tanque/marcacoes/${id}`);
 }

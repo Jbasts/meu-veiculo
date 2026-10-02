@@ -50,6 +50,15 @@ export function hojeIso(agora: Date = new Date()): string {
   return `${valor("year")}-${valor("month")}-${valor("day")}`;
 }
 
+/**
+ * Dia (em Brasília) de um instante com hora e fuso, como o último acesso
+ * ("2026-09-21T23:30:00-03:00" -> "2026-09-21"). Diferente dos campos DATE,
+ * aqui há hora e fuso de verdade, então a conversão é correta.
+ */
+export function diaDoInstante(instante: string): string {
+  return hojeIso(new Date(instante));
+}
+
 export interface MesAno {
   ano: number;
   mes: number; // 1 a 12

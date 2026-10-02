@@ -11,10 +11,13 @@ from fastapi import APIRouter, Depends
 from app.dependencias import exigir_banco_atualizado, verificar_cabecalho_do_app
 from app.routes import (
     abastecimento_routes,
+    admin_routes,
     auth_routes,
     diagnostico_routes,
     gasto_routes,
     manutencao_routes,
+    medicao_tanque_routes,
+    painel_routes,
     projeto_routes,
     saude_routes,
     veiculo_routes,
@@ -25,5 +28,6 @@ api_router.include_router(saude_routes.router)
 
 BANCO_ATUALIZADO = [Depends(exigir_banco_atualizado)]
 for modulo in (auth_routes, veiculo_routes, manutencao_routes, diagnostico_routes, gasto_routes,
-               abastecimento_routes, projeto_routes):
+               abastecimento_routes, medicao_tanque_routes, projeto_routes, painel_routes,
+               admin_routes):
     api_router.include_router(modulo.router, dependencies=BANCO_ATUALIZADO)

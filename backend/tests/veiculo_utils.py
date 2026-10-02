@@ -21,6 +21,7 @@ CIVIC = {
     "marca": "Honda", "modelo": "Civic", "versao": None, "ano": 2020, "placa": "ABC-1234",
     "cor": None, "tipo_combustivel": "flex", "quilometragem": 85000,
     "data_aquisicao": "2022-03-15", "valor_aquisicao": "65000.00", "km_aquisicao": 22000,
+    "capacidade_tanque": "56.0",
 }
 
 

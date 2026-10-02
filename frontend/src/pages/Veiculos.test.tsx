@@ -13,7 +13,7 @@ const CIVIC: Veiculo = {
   placa: "ABC1234", cor: null, tipo_combustivel: "flex", quilometragem: 85000,
   data_leitura_km: "2026-09-20", km_aquisicao: 22000, data_aquisicao: "2022-03-15",
   valor_aquisicao: "65000.00", ativo: true, criado_em: "2026-09-01T10:00:00-03:00",
-  em_uso: true, foto_capa_id: null,
+  em_uso: true, foto_capa_id: null, capacidade_tanque: "56.0", tanque_pendente: false,
 };
 
 const LEITURA: LeituraKm = {
@@ -169,6 +169,7 @@ describe("Cadastrar veículo", () => {
     await userEvent.type(screen.getByLabelText("Ano"), "2020");
     await userEvent.type(screen.getByLabelText("Placa"), placa);
     await userEvent.type(screen.getByLabelText("Quilometragem atual"), "85000");
+    await userEvent.type(screen.getByLabelText("Tamanho do tanque (litros)"), "47,5");
   }
 
   it("envia os dados, com dinheiro em texto e sem campos de dono", async () => {
@@ -190,8 +191,40 @@ describe("Cadastrar veículo", () => {
     expect(JSON.parse(corpoDe(buscar, "POST /api/veiculos") as string)).toEqual({
       marca: "Honda", modelo: "Civic", versao: null, ano: 2020, placa: "ABC-1234", cor: null,
       tipo_combustivel: "gasolina", quilometragem: 85000, data_aquisicao: "2022-03-15",
-      valor_aquisicao: "65000.00", km_aquisicao: 22000,
+      valor_aquisicao: "65000.00", km_aquisicao: 22000, capacidade_tanque: "47.500",
     });
+  });
+
+  it("pede o tamanho do tanque, menos no elétrico", async () => {
+    const buscar = apiFalsa({
+      ...COM_CIVIC,
+      "GET /api/veiculos": () => json(200, []),
+      "POST /api/veiculos": () => json(201, { ...CIVIC, tipo_combustivel: "eletrico", capacidade_tanque: null }),
+    });
+    renderizarApp("/veiculos/novo");
+    await userEvent.type(await screen.findByLabelText("Marca"), "BYD");
+    await userEvent.type(screen.getByLabelText("Modelo"), "Dolphin");
+    await userEvent.type(screen.getByLabelText("Ano"), "2024");
+    await userEvent.type(screen.getByLabelText("Placa"), "BYD1A23");
+    await userEvent.type(screen.getByLabelText("Quilometragem atual"), "1000");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar veículo" }));
+    expect(screen.getByText("Informe o tamanho do tanque em litros (está no manual do veículo).")).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Tamanho do tanque (litros)"), "47,55");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar veículo" }));
+    expect(screen.getByText("Tamanho inválido. Exemplo: 47 ou 47,5.")).toBeInTheDocument();
+    // Elétrico não tem tanque: o campo some e vai vazio.
+    await userEvent.click(screen.getByRole("radio", { name: "Elétrico" }));
+    expect(screen.queryByLabelText("Tamanho do tanque (litros)")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Salvar veículo" }));
+    expect(await screen.findByText("Veículo cadastrado.")).toBeInTheDocument();
+    expect(JSON.parse(corpoDe(buscar, "POST /api/veiculos") as string).capacidade_tanque).toBeNull();
+  });
+
+  it("veículo antigo sem o tamanho do tanque: aviso na tela do veículo", async () => {
+    apiFalsa({ ...COM_CIVIC, "GET /api/veiculos/7": () => json(200, { ...CIVIC, capacidade_tanque: null, tanque_pendente: true }) });
+    renderizarApp("/veiculos/7");
+    expect(await screen.findByText(/Falta o tamanho do tanque no cadastro/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Informar agora" })).toHaveAttribute("href", "/veiculos/7/editar");
   });
 
   it("valida na tela antes de enviar", async () => {

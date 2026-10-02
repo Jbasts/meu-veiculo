@@ -13,6 +13,7 @@ from fastapi import FastAPI
 
 from app.controllers.erros_http import registrar_tratadores_de_erro
 from app.controllers.limite_corpo import LimiteDeCorpo
+from app.controllers.sem_cache import SemCacheNaApi
 from app.dependencias import avisar_se_banco_desatualizado
 from app.routes import api_router
 
@@ -26,4 +27,5 @@ async def ao_iniciar(_app: FastAPI):
 app = FastAPI(title="Meu Veículo API", version="0.1.0", lifespan=ao_iniciar)
 registrar_tratadores_de_erro(app)
 app.add_middleware(LimiteDeCorpo)
+app.add_middleware(SemCacheNaApi)
 app.include_router(api_router)

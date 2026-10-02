@@ -12,11 +12,23 @@ from app.schemas.abastecimento_schema import (
     AbastecimentoResposta,
     ComparacaoResposta,
     MediaResposta,
+    MesResposta,
     PaginaAbastecimentos,
     ResumoCombustivelResposta,
     SituacaoResposta,
 )
 from app.services.abastecimento_service import AbastecimentoDetalhe, AbastecimentoService
+from app.services.consumo import Media
+
+MILESIMO = Decimal("0.001")
+
+
+def media_resposta(m: Media) -> dict:
+    faixa = m.minimo_e_maximo
+    return dict(combustivel=m.combustivel, km_por_litro=m.km_por_litro, distancia=m.distancia,
+                quantidade=m.quantidade.quantize(MILESIMO), ciclos=m.ciclos, estimada=m.estimada,
+                margem=m.margem.quantize(MILESIMO), km_por_litro_minimo=faixa[0] if faixa else None,
+                km_por_litro_maximo=faixa[1] if faixa else None, inicio=m.inicio, fim=m.fim)
 
 
 def abastecimento_resposta(detalhe: AbastecimentoDetalhe) -> AbastecimentoDetalheResposta:
@@ -54,9 +66,10 @@ class AbastecimentoController:
         r = self._service.resumo(atual.usuario, veiculo_id, preco_gasolina, preco_etanol)
         return ResumoCombustivelResposta(
             combustiveis=list(r.combustiveis),
-            medias=[MediaResposta(combustivel=m.combustivel, km_por_litro=m.km_por_litro,
-                                  distancia=m.distancia, quantidade=m.quantidade, ciclos=m.ciclos)
-                    for m in r.medias],
+            medias=[MediaResposta(**media_resposta(m)) for m in r.medias],
             comparacao=ComparacaoResposta(**asdict(r.comparacao)) if r.comparacao else None,
             postos_recentes=r.postos_recentes, ultima_quilometragem=r.ultima_quilometragem,
+            capacidade_tanque=r.capacidade_tanque, tanque_pendente=r.tanque_pendente,
+            marcacao_do_mes_pendente=r.marcacao_do_mes_pendente,
+            meses=[MesResposta(ano=mes.ano, mes=mes.mes, **media_resposta(mes.media)) for mes in r.meses],
         )

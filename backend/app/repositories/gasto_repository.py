@@ -78,6 +78,17 @@ class GastoRepository:
             .where(Gasto.veiculo_id == veiculo_id, Gasto.pago.is_(False))
         ) or 0
 
+    def contas_em_atraso(self, veiculo_id: int, hoje: date) -> tuple[int, Decimal, int]:
+        """(vencidas, total das vencidas, que vencem hoje), só dos gastos pendentes."""
+        vencida = Gasto.data_vencimento < hoje
+        linha = self._sessao.execute(
+            select(func.count().filter(vencida),
+                   func.coalesce(func.sum(Gasto.valor).filter(vencida), 0),
+                   func.count().filter(Gasto.data_vencimento == hoje))
+            .where(Gasto.veiculo_id == veiculo_id, Gasto.pago.is_(False))
+        ).one()
+        return linha[0], Decimal(linha[1]).quantize(Decimal("0.01")), linha[2]
+
     def pendentes(self, veiculo_id: int, limite: int, deslocamento: int) -> list[Gasto]:
         """Do vencimento mais antigo para o mais distante (vencidos primeiro)."""
         return list(self._sessao.scalars(

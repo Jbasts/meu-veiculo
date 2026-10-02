@@ -17,12 +17,14 @@ from app.schemas.veiculo_schema import (
     VeiculoResposta,
 )
 from app.services.quilometragem_service import QuilometragemService
+from app.services.tanque import tanque_pendente
 from app.services.veiculo_service import VeiculoDetalhe, VeiculoService
 
 
 def resposta_de(detalhe: VeiculoDetalhe) -> VeiculoResposta:
-    """Junta os dados do veículo com o que é calculado (em uso, capa)."""
-    calculados = {"em_uso": detalhe.em_uso, "foto_capa_id": detalhe.foto_capa_id}
+    """Junta os dados do veículo com o que é calculado (em uso, capa, tanque sem tamanho)."""
+    calculados = {"em_uso": detalhe.em_uso, "foto_capa_id": detalhe.foto_capa_id,
+                  "tanque_pendente": tanque_pendente(detalhe.veiculo)}
     do_banco = {campo: getattr(detalhe.veiculo, campo)
                 for campo in VeiculoResposta.model_fields if campo not in calculados}
     return VeiculoResposta(**do_banco, **calculados)

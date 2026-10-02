@@ -6,6 +6,12 @@ Sessões:
   redefinição por link (todas);
 - conta desativada perde o acesso na próxima requisição, mesmo com sessão.
 
+Links de uso único (tabela recuperacao_senha), consumidos em redefinir_senha:
+- recuperação: "Esqueci minha senha" ou enviado pelo administrador; vale
+  RECUPERACAO_MINUTOS (padrão 60);
+- convite: conta criada pelo administrador, sem senha conhecida; a pessoa
+  define a senha pelo link, que vale CONVITE_DIAS (padrão 7).
+
 Limites de tentativas (contados no banco, valem mesmo reiniciando a API):
 - login: 5 erros por e-mail ou 20 erros por endereço de rede em 15 minutos;
 - recuperação: 3 pedidos por e-mail (silencioso, sem revelar nada) ou
@@ -63,7 +69,8 @@ def _ip_curto(ip: str | None) -> str | None:
 class AutenticacaoService:
     def __init__(self, uow: Transacional, usuarios, sessoes, recuperacoes, tentativas,
                  senhas: SenhaService, *, validade_sessao: timedelta,
-                 validade_link: timedelta, url_frontend: str):
+                 validade_link: timedelta, url_frontend: str,
+                 validade_convite: timedelta = timedelta(days=7)):
         self._uow = uow
         self._usuarios = usuarios
         self._sessoes = sessoes
@@ -72,6 +79,7 @@ class AutenticacaoService:
         self._senhas = senhas
         self._validade_sessao = validade_sessao
         self._validade_link = validade_link
+        self._validade_convite = validade_convite
         self._url_frontend = url_frontend.rstrip("/")
 
     # ------------------------------------------------------------------ cadastro
@@ -200,20 +208,49 @@ class AutenticacaoService:
         usuario = self._usuarios.buscar_por_email(email)
         if usuario is None or not usuario.ativo:
             return None
-        token = gerar_token()
         with self._uow.transacao():
-            self._recuperacoes.cancelar_pendentes(usuario.id)
-            self._recuperacoes.criar(usuario.id, hash_de(token), self._validade_link)
-        return self._email_de_recuperacao(usuario, token)
+            return self.link_de_recuperacao(usuario)
 
-    def _email_de_recuperacao(self, usuario: Usuario, token: str) -> MensagemEmail:
+    def _novo_link(self, usuario: Usuario, finalidade: str, validade: timedelta) -> str:
+        """Cria o link (só o hash vai para o banco) e cancela os anteriores.
+        Precisa rodar dentro de uma transação."""
+        token = gerar_token()
+        self._recuperacoes.cancelar_pendentes(usuario.id)
+        self._recuperacoes.criar(usuario.id, hash_de(token), validade, finalidade)
         # O token vai depois do "#": essa parte do endereço não é enviada a
         # nenhum servidor, nem aparece em logs.
-        link = f"{self._url_frontend}/redefinir-senha#token={token}"
-        minutos = int(self._validade_link.total_seconds() // 60)
+        return f"{self._url_frontend}/redefinir-senha#token={token}"
+
+    def link_de_convite(self, usuario: Usuario, quem_convidou: str) -> MensagemEmail:
+        """E-mail de convite para a conta criada pelo administrador. Precisa
+        rodar dentro de uma transação."""
+        link = self._novo_link(usuario, "convite", self._validade_convite)
+        dias = self._validade_convite.days
         texto = (
             f"Olá, {usuario.nome}.\n\n"
-            "Recebemos um pedido para redefinir a senha da sua conta no Meu Veículo.\n\n"
+            f"{quem_convidou} criou uma conta para você no Meu Veículo, o app para acompanhar "
+            "gastos, abastecimentos, manutenções e fotos do seu carro.\n\n"
+            f"Para definir a sua senha, abra o link abaixo. Ele vale por {dias} "
+            f"{'dia' if dias == 1 else 'dias'} e só pode ser usado uma vez:\n\n"
+            f"{link}\n\n"
+            f"Depois, entre com este e-mail ({usuario.email}) e a senha que você criou. "
+            "Se não esperava este convite, ignore esta mensagem.\n"
+        )
+        return MensagemEmail(para=usuario.email, assunto="Meu Veículo: sua conta foi criada",
+                             texto=texto)
+
+    def link_de_recuperacao(self, usuario: Usuario, *,
+                            pedido_pelo_admin: bool = False) -> MensagemEmail:
+        """E-mail com um link novo para criar uma senha. Precisa rodar dentro
+        de uma transação."""
+        link = self._novo_link(usuario, "recuperacao", self._validade_link)
+        minutos = int(self._validade_link.total_seconds() // 60)
+        pedido = ("Um administrador do Meu Veículo enviou este link para você criar uma senha nova."
+                  if pedido_pelo_admin else
+                  "Recebemos um pedido para redefinir a senha da sua conta no Meu Veículo.")
+        texto = (
+            f"Olá, {usuario.nome}.\n\n"
+            f"{pedido}\n\n"
             f"Para criar uma senha nova, abra o link abaixo. Ele vale por {minutos} minutos "
             "e só pode ser usado uma vez:\n\n"
             f"{link}\n\n"

@@ -40,6 +40,8 @@ class VeiculoEdicaoEntrada(_Entrada):
     data_aquisicao: date | None = None
     valor_aquisicao: Dinheiro | None = None
     km_aquisicao: int | None = None
+    # Litros, 1 casa ("47.5"). Obrigatório, menos no elétrico (sem tanque).
+    capacidade_tanque: Dinheiro | None = None
 
 
 class VeiculoEntrada(VeiculoEdicaoEntrada):
@@ -65,6 +67,9 @@ class VeiculoResposta(BaseModel):
     km_aquisicao: int | None
     data_aquisicao: date | None
     valor_aquisicao: Decimal | None
+    # Litros do tanque; null = não informado (veículo antigo: a tela pede) ou elétrico.
+    capacidade_tanque: Decimal | None
+    tanque_pendente: bool
     ativo: bool
     criado_em: datetime
     em_uso: bool

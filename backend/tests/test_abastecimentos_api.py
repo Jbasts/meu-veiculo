@@ -54,8 +54,11 @@ def resumo(cliente, veiculo_id: int, **params) -> dict:
 def test_registrar_com_total_calculado_meio_para_cima(paula, civic, hoje):
     criado = abastecer(paula, civic["id"], hoje, 85100, litros="38.5", preco="4.29", combustivel="etanol")
     assert (criado["litros"], criado["valor_litro"], criado["valor_total"]) == ("38.500", "4.290", "165.17")
-    assert criado["consumo"] == {"tipo": "primeiro_cheio", "km_por_litro": None,
-                                 "motivo": "Primeiro tanque cheio: o consumo aparece no próximo tanque cheio."}
+    assert criado["consumo"] == {
+        "tipo": "primeiro_cheio", "km_por_litro": None, "estimado": False, "km_por_litro_minimo": None,
+        "km_por_litro_maximo": None,
+        "motivo": "Primeiro tanque cheio: o consumo aparece no próximo tanque cheio ou nível do marcador."}
+    assert criado["nivel_antes"] is None
     assert km_do_veiculo(paula, civic["id"]) == 85100  # vira leitura do hodômetro
     assert paula.get(caminho(civic["id"], f"/abastecimentos/{criado['id']}")).json() == criado
 
@@ -131,14 +134,14 @@ def test_ciclo_do_exemplo_pela_api(paula, civic, hoje):
 
 def test_lancamento_historico_e_edicao_recalculam_os_ciclos(paula, civic, hoje):
     antigo = abastecer(paula, civic["id"], hoje - timedelta(days=10), 84000, litros="40")
-    atual = abastecer(paula, civic["id"], hoje, 85200, litros="100")       # 1200 / 100 = 12
+    atual = abastecer(paula, civic["id"], hoje, 84600, litros="50")        # 600 / 50 = 12
     assert lista(paula, civic["id"])[0]["consumo"]["km_por_litro"] == "12.0"
-    # Um parcial esquecido, lançado depois, entra no ciclo: 1200 / 120 = 10.
-    parcial = abastecer(paula, civic["id"], hoje - timedelta(days=5), 84600, litros="20", tanque_cheio=False)
+    # Um parcial esquecido, lançado depois, entra no ciclo: 600 / 60 = 10.
+    parcial = abastecer(paula, civic["id"], hoje - timedelta(days=5), 84300, litros="10", tanque_cheio=False)
     assert lista(paula, civic["id"])[0]["consumo"]["km_por_litro"] == "10.0"
-    # Corrigir a quantidade do parcial recalcula de novo: 1200 / 150 = 8.
+    # Corrigir a quantidade do parcial recalcula de novo: 600 / 75 = 8.
     editado = paula.put(caminho(civic["id"], f"/abastecimentos/{parcial['id']}"),
-                        json=dados(hoje - timedelta(days=5), 84600, litros="50", tanque_cheio=False))
+                        json=dados(hoje - timedelta(days=5), 84300, litros="25", tanque_cheio=False))
     assert editado.status_code == 200, editado.text
     assert lista(paula, civic["id"])[0]["consumo"]["km_por_litro"] == "8.0"
     # Apagar o cheio inicial: o atual vira o primeiro cheio (sem consumo).

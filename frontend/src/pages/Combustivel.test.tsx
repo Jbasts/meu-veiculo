@@ -15,7 +15,7 @@ const CIVIC: Veiculo = {
   placa: "ABC1234", cor: null, tipo_combustivel: "flex", quilometragem: 85000,
   data_leitura_km: "2026-09-20", km_aquisicao: 22000, data_aquisicao: "2022-03-15",
   valor_aquisicao: "65000.00", ativo: true, criado_em: "2026-09-01T10:00:00-03:00",
-  em_uso: true, foto_capa_id: null,
+  em_uso: true, foto_capa_id: null, capacidade_tanque: "56.0", tanque_pendente: false,
 };
 const HOJE = hojeIso();
 const ATUAL = mesDaData(HOJE);
@@ -23,13 +23,16 @@ const ATUAL = mesDaData(HOJE);
 const RESUMO: ResumoCombustivel = {
   combustiveis: ["gasolina", "etanol"],
   medias: [
-    { combustivel: "gasolina", km_por_litro: "11.3", distancia: 339, quantidade: "30.000", ciclos: 1 },
-    { combustivel: "etanol", km_por_litro: "7.9", distancia: 237, quantidade: "30.000", ciclos: 1 },
+    { combustivel: "gasolina", km_por_litro: "11.3", distancia: 339, quantidade: "30.000", ciclos: 1, estimada: false, margem: "0.000",
+      km_por_litro_minimo: null, km_por_litro_maximo: null, inicio: null, fim: null },
+    { combustivel: "etanol", km_por_litro: "7.9", distancia: 237, quantidade: "30.000", ciclos: 1, estimada: false, margem: "0.000",
+      km_por_litro_minimo: null, km_por_litro_maximo: null, inicio: null, fim: null },
   ],
   comparacao: { recomendacao: "etanol", motivo: null, limite_percentual: 70, relacao_percentual: 69,
     preco_gasolina: "6.250", preco_etanol: "4.290", precos_simulados: false },
   postos_recentes: ["Shell", "Ipiranga"],
   ultima_quilometragem: 85000,
+  capacidade_tanque: "56.0", tanque_pendente: false, marcacao_do_mes_pendente: false, meses: [],
 };
 const SEM_DADOS: ResumoCombustivel = {
   ...RESUMO, medias: [], postos_recentes: [],
@@ -41,16 +44,16 @@ const SEM_DADOS: ResumoCombustivel = {
 function abastecimento(alteracoes: Partial<Abastecimento>): Abastecimento {
   return {
     id: 1, veiculo_id: 7, data: "2026-09-20", quilometragem: 85339, combustivel: "gasolina", tipo: "comum",
-    litros: "40.000", valor_litro: "6.250", valor_total: "250.00", tanque_cheio: true, posto: "Shell",
+    litros: "40.000", valor_litro: "6.250", valor_total: "250.00", tanque_cheio: true, nivel_antes: null, posto: "Shell",
     criado_em: "2026-09-20T10:00:00-03:00",
-    consumo: { tipo: "consumo", km_por_litro: "11.3", motivo: null }, ...alteracoes,
+    consumo: { tipo: "consumo", km_por_litro: "11.3", motivo: null , estimado: false, km_por_litro_minimo: null, km_por_litro_maximo: null }, ...alteracoes,
   };
 }
 
 const LISTA = [
   abastecimento({}),
   abastecimento({ id: 2, data: "2026-09-08", posto: null, litros: "16.000", valor_total: "100.00",
-    tanque_cheio: false, consumo: { tipo: "parcial", km_por_litro: null, motivo: null } }),
+    tanque_cheio: false, consumo: { tipo: "parcial", km_por_litro: null, motivo: null , estimado: false, km_por_litro_minimo: null, km_por_litro_maximo: null } }),
 ];
 
 function pagina<T>(itens: T[], porPagina = 30) {
@@ -59,12 +62,14 @@ function pagina<T>(itens: T[], porPagina = 30) {
 
 const URL_RESUMO = "GET /api/veiculos/7/combustivel/resumo";
 const URL_LISTA = "GET /api/veiculos/7/abastecimentos?pagina=1&por_pagina=30";
+const URL_MARCACOES = "GET /api/veiculos/7/tanque/marcacoes?pagina=1&por_pagina=30";
 const BASE = {
   "GET /api/auth/eu": () => json(200, PAULA),
   "GET /api/veiculos": () => json(200, [CIVIC]),
   "GET /api/veiculos/7": () => json(200, CIVIC),
   [URL_RESUMO]: () => json(200, RESUMO),
   [URL_LISTA]: () => pagina(LISTA),
+  [URL_MARCACOES]: () => pagina([]),
   // A tela de Finanças também carrega a aba Gastos ao voltar do formulário.
   [`GET /api/veiculos/7/financas/resumo?ano=${ATUAL.ano}&mes=${ATUAL.mes}`]: () => json(200, {
     periodo: "mes", ano: ATUAL.ano, mes: ATUAL.mes, total: "0.00", quantidade: 0, categorias: [],
@@ -81,7 +86,7 @@ describe("Finanças: aba Combustível", () => {
   it("lista recargas com o tipo e o consumo em km/kWh", async () => {
     apiFalsa({ ...BASE, [URL_LISTA]: () => pagina([abastecimento({ combustivel: "eletrica", tipo: "ac",
       posto: "Casa", litros: "40.000", valor_litro: "0.900", valor_total: "36.00",
-      consumo: { tipo: "consumo", km_por_litro: "6.0", motivo: null } })]) });
+      consumo: { tipo: "consumo", km_por_litro: "6.0", motivo: null , estimado: false, km_por_litro_minimo: null, km_por_litro_maximo: null } })]) });
     renderizarApp("/financas?aba=combustivel");
     const lista = await screen.findByRole("region", { name: "Abastecimentos" });
     const [item] = within(lista).getAllByRole("link");
@@ -158,8 +163,60 @@ describe("Novo abastecimento", () => {
     expect(await screen.findByText("Abastecimento registrado.")).toBeInTheDocument();
     expect(corpoJson(buscar, "POST /api/veiculos/7/abastecimentos")).toEqual({
       combustivel: "etanol", tipo: "comum", data: HOJE, quilometragem: 85450, litros: "38.500", valor_litro: "4.290",
-      valor_total: null, tanque_cheio: true, posto: "Ipiranga",
+      valor_total: null, tanque_cheio: true, nivel_antes: null, posto: "Ipiranga",
     });
+  });
+
+  it("calcula os litros pelo valor total e o preço e envia só o que foi digitado", async () => {
+    const buscar = apiFalsa({ ...BASE, "POST /api/veiculos/7/abastecimentos": () => json(201, abastecimento({})) });
+    renderizarApp("/veiculos/7/abastecimentos/novo");
+    await userEvent.type(await screen.findByLabelText("Quilometragem"), "85450");
+    await userEvent.click(screen.getByRole("radio", { name: "Litros" }));
+    expect(screen.queryByRole("textbox", { name: "Litros" })).not.toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Preço por litro"), "6,25");
+    await userEvent.type(screen.getByLabelText("Valor total (R$)"), "250,00");
+    // 250,00 ÷ 6,25 = 40 L
+    expect(within(screen.getByRole("region", { name: "Litros" })).getByText("40 L")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Salvar abastecimento" }));
+    expect(await screen.findByText("Abastecimento registrado.")).toBeInTheDocument();
+    const corpo = corpoJson(buscar, "POST /api/veiculos/7/abastecimentos");
+    expect([corpo.litros, corpo.valor_litro, corpo.valor_total]).toEqual([null, "6.250", "250.00"]);
+  });
+
+  it("calcula o preço pelo valor total e os litros", async () => {
+    apiFalsa(BASE);
+    renderizarApp("/veiculos/7/abastecimentos/novo");
+    await userEvent.click(await screen.findByRole("radio", { name: "Preço" }));
+    await userEvent.type(screen.getByLabelText("Litros"), "38,5");
+    await userEvent.type(screen.getByLabelText("Valor total (R$)"), "165,17");
+    // 165,17 ÷ 38,5 = 4,2901... -> R$ 4,29
+    expect(within(screen.getByRole("region", { name: "Preço por litro" })).getByText("R$ 4,29")).toBeInTheDocument();
+  });
+
+  it("com o nível do marcador mostra quanto cabe e avisa quando passa do tanque", async () => {
+    const buscar = apiFalsa({ ...BASE, "POST /api/veiculos/7/abastecimentos": () => json(201, abastecimento({})) });
+    renderizarApp("/veiculos/7/abastecimentos/novo");
+    await userEvent.type(await screen.findByLabelText("Quilometragem"), "85450");
+    await userEvent.click(screen.getByRole("radio", { name: "Etanol" }));
+    await userEvent.click(screen.getByRole("radio", { name: "1/4" }));
+    await userEvent.type(screen.getByLabelText("Preço por litro"), "4,00");
+    expect(screen.getByText(/Com o marcador em 1\/4, cabem cerca de 42 L no tanque de 56 L: encher sai por cerca de R\$ 168,00\./))
+      .toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Litros"), "60");
+    expect(screen.getByText(/60 L parece mais do que cabe no tanque de 56 L com o marcador em 1\/4/)).toBeInTheDocument();
+    await userEvent.clear(screen.getByLabelText("Litros"));
+    await userEvent.type(screen.getByLabelText("Litros"), "40");
+    expect(screen.queryByText(/parece mais do que cabe/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Salvar abastecimento" }));
+    expect(await screen.findByText("Abastecimento registrado.")).toBeInTheDocument();
+    expect(corpoJson(buscar, "POST /api/veiculos/7/abastecimentos").nivel_antes).toBe(2);
+  });
+
+  it("sem o tamanho do tanque, o nível não aparece e a tela pede para informar", async () => {
+    apiFalsa({ ...BASE, [URL_RESUMO]: () => json(200, { ...RESUMO, capacidade_tanque: null, tanque_pendente: true }) });
+    renderizarApp("/veiculos/7/abastecimentos/novo");
+    expect(await screen.findByRole("link", { name: "informe o tamanho do tanque" })).toHaveAttribute("href", "/veiculos/7/editar");
+    expect(screen.queryByRole("radiogroup", { name: /Marcador antes de abastecer/ })).not.toBeInTheDocument();
   });
 
   it("corrige pelo cupom e mostra o erro do servidor no campo", async () => {
