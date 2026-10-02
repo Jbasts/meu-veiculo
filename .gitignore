@@ -35,3 +35,6 @@ Thumbs.db
 
 # Configurações locais do Claude Code
 .claude/settings.local.json
+
+# Certificado HTTPS da rede de casa (mkcert). A chave é secreta.
+frontend/certificados/

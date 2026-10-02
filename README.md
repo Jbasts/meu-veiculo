@@ -495,30 +495,100 @@ Para testar:
 
 A pasta `emails_dev` não vai para o Git: os arquivos contêm links válidos.
 
-### 10.2 Envio real: modo "smtp"
+### 10.2 Envio real pelo Gmail (modo "smtp")
 
-No `backend\.env`:
+Com `EMAIL_MODO=smtp`, as mensagens de "Esqueci a senha" e os convites saem de
+verdade por uma conta do Gmail. O Gmail não aceita a senha normal da conta
+para isso: ele exige uma **senha de app**, uma senha de 16 letras criada só
+para o Meu Veículo, que você pode apagar quando quiser sem mexer na senha da
+conta.
+
+**Passo 1. Escolha a conta que vai enviar.** Recomendo criar um Gmail só para
+o sistema (por exemplo, `meuveiculo.suaconta@gmail.com`). Assim, a senha de
+app guardada no `backend\.env` não dá acesso ao seu e-mail pessoal. Usar a
+sua conta pessoal também funciona.
+
+**Passo 2. Ligue a verificação em duas etapas** dessa conta (o Google só
+oferece senha de app com ela ligada): https://myaccount.google.com/security →
+**Verificação em duas etapas** → siga as telas.
+
+**Passo 3. Crie a senha de app:** https://myaccount.google.com/apppasswords →
+nome do app: `Meu Veículo` → **Criar**. O Google mostra 16 letras em quatro
+grupos (`abcd efgh ijkl mnop`). Copie **sem os espaços**. Ela só aparece uma
+vez; se perder, apague e crie outra.
+
+**Passo 4. Preencha o `backend\.env`** (abra no VS Code; não cole o conteúdo
+dele em conversas nem no Git):
 
 ```
 EMAIL_MODO=smtp
-EMAIL_REMETENTE=Meu Veículo <seu-endereco@provedor.com>
-SMTP_HOST=smtp.provedor.com
+EMAIL_REMETENTE=Meu Veículo <meuveiculo.suaconta@gmail.com>
+SMTP_HOST=smtp.gmail.com
 SMTP_PORTA=587
 SMTP_SEGURANCA=starttls
-SMTP_USUARIO=seu-endereco@provedor.com
-SMTP_SENHA=senha-de-app-do-provedor
+SMTP_USUARIO=meuveiculo.suaconta@gmail.com
+SMTP_SENHA=abcdefghijklmnop
 URL_FRONTEND=http://localhost:5173
 ```
 
-- Gmail e Outlook exigem uma "senha de app" (criada nas configurações de segurança da conta), não a senha normal.
-- Porta 587 usa `starttls`; porta 465 usa `ssl`.
-- `URL_FRONTEND` precisa ser o endereço que a pessoa abre no navegador. Para os links funcionarem também no celular, use o IP do computador (seção 18.6).
-- Reinicie o backend depois de mudar o `.env`.
-- Uma falha de envio aparece no terminal do backend só como `Falha ao enviar e-mail (tipo do erro)`, sem destinatário nem conteúdo. A tela mostra a mesma mensagem de sempre.
+- `EMAIL_REMETENTE` precisa usar o **mesmo endereço** de `SMTP_USUARIO`; o
+  nome antes dele ("Meu Veículo") é livre.
+- `URL_FRONTEND` é o começo dos links das mensagens. Para os links abrirem no
+  celular, use o IP do computador (seção 18.6) ou o endereço HTTPS (seção 18.8).
 
-**Situação de teste:** o envio real por SMTP tem código pronto, mas **não foi
-testado** com um provedor de verdade: depende da sua conta de e-mail. O modo
-"arquivo" foi testado de ponta a ponta.
+**Passo 5. Teste o envio** (pasta `meu-veiculo\backend`; o backend pode estar
+ligado ou desligado). Mande para um endereço seu, de preferência outro que não
+o da conta que envia:
+
+```powershell
+.\.venv\Scripts\python.exe gerenciar.py testar-email seu-email@exemplo.com
+```
+
+Esperado (a senha nunca é mostrada):
+
+```
+Modo: smtp
+Servidor: smtp.gmail.com, porta 587, segurança starttls
+Usuário: meuveiculo.suaconta@gmail.com; senha: preenchida
+Remetente: Meu Veículo <meuveiculo.suaconta@gmail.com>
+Links dos e-mails começam com: http://localhost:5173
+
+Enviado para seu-email@exemplo.com. Confira a caixa de entrada (e a pasta de spam).
+```
+
+Se der errado, o comando diz o motivo e o que conferir, por exemplo
+`ERRO: o e-mail não foi enviado. O servidor recusou o usuário ou a senha...`.
+Antes de tentar, ele também confere o `.env` (servidor vazio, porta e
+segurança trocadas, remetente diferente do usuário).
+
+**Passo 6. Teste pelo sistema.** Reinicie o backend (ele só lê o `.env` ao
+iniciar), abra **Esqueci a senha**, informe o e-mail de uma conta cadastrada e
+confira a caixa de entrada. Por segurança, a tela mostra sempre a mesma
+mensagem, exista a conta ou não; se o envio falhar, o terminal do backend
+mostra só `Falha ao enviar e-mail (tipo do erro)`, sem destinatário nem
+conteúdo. Para descobrir o motivo, use o `testar-email` do passo 5.
+
+| Mensagem do `testar-email` | O que fazer |
+|---|---|
+| "recusou o usuário ou a senha" | confira se `SMTP_SENHA` é a senha de app (16 letras, sem espaços) e se `SMTP_USUARIO` é o endereço completo; crie outra senha de app se precisar |
+| "Não encontrei o servidor" | confira `SMTP_HOST=smtp.gmail.com` e a internet |
+| "não respondeu a tempo" | rede ou antivírus bloqueando a porta 587; teste em outra rede |
+| "A conexão segura falhou" | use 587 com `starttls` (ou 465 com `ssl`). Antivírus com proteção de e-mail (como o Avast, que está no seu computador) pode atrapalhar: desligue por alguns minutos a verificação de e-mails enviados e teste de novo |
+| "Modo arquivo: nada saiu do computador" | falta `EMAIL_MODO=smtp` no `.env` |
+| a mensagem chegou na pasta de spam | comum nas primeiras mensagens de uma conta nova; marque "Não é spam" |
+
+Para voltar ao modo de desenvolvimento, troque para `EMAIL_MODO=arquivo`. Para
+desligar o acesso do sistema à conta, apague a senha de app em
+https://myaccount.google.com/apppasswords.
+
+Contas pessoais do Outlook/Hotmail ficaram de fora: a Microsoft está trocando o
+login por senha no envio (SMTP) por outro método, que este sistema não usa.
+
+**Situação de teste:** o envio por SMTP foi testado de ponta a ponta com um
+servidor SMTP falso, dentro dos testes automáticos
+(`backend\tests\test_envio_smtp.py`): login, entrega, senha recusada,
+servidor desligado e configuração errada. O envio pelo **Gmail de verdade**
+depende da sua conta e **não foi testado por mim**.
 
 Alternativa local que imita um servidor SMTP: o programa gratuito **Mailpit**
 (https://mailpit.axllent.org). Com ele rodando, use `EMAIL_MODO=smtp`,
@@ -1387,7 +1457,8 @@ use a porta do jeito escolhido:
 URL_FRONTEND=http://192.168.0.10:4173
 ```
 
-Reinicie o backend depois de mudar. O computador também abre esse endereço.
+Com HTTPS (seção 18.8), use `https://192.168.0.10:4173`. Reinicie o backend
+depois de mudar. O computador também abre esse endereço.
 
 ### 18.7 HTTPS, instalação e câmera
 
@@ -1428,11 +1499,125 @@ tela inicial" → Instalar). O Meu Veículo ganha ícone próprio e abre em tela
 cheia, sem a barra do navegador. O endereço continua sendo o do computador:
 ele precisa estar ligado e no mesmo Wi-Fi.
 
-HTTPS de verdade na rede local (certificado próprio instalado no celular, por
-exemplo com o programa mkcert) também resolveria, mas não foi configurado nem
-testado neste projeto. Com HTTPS, use `COOKIE_SEGURO=true` no `.env`.
+**C. HTTPS na rede de casa (recomendado para o dia a dia).** Sem cabo e sem
+configuração experimental: um certificado próprio criado com o mkcert e
+instalado no celular. Passo a passo na seção 18.8.
 
-### 18.8 O que o aplicativo instalado guarda no celular
+### 18.8 HTTPS na rede de casa (certificado próprio com o mkcert)
+
+As alternativas A e B da seção 18.7 servem para um teste rápido. Para usar o
+app instalado no dia a dia, sem cabo e sem mexer em configurações
+experimentais do Chrome, o caminho é **HTTPS de verdade** na rede de casa:
+o endereço passa a ser `https://SEU-IP:4173`, com cadeado e sem aviso.
+
+**Como funciona, em poucas palavras.** Um site HTTPS apresenta um
+*certificado*, uma espécie de documento que diz "eu sou o 192.168.0.10". O
+celular só aceita esse documento se ele for assinado por uma *autoridade
+certificadora* em que ele confia. Na internet, essas autoridades são empresas.
+Em casa, o programa gratuito **mkcert** cria uma autoridade **só sua**: você a
+instala no computador e no celular, e ela assina o certificado do Meu Veículo.
+Nada é contratado e nada sai da sua rede.
+
+> **Cuidado com um arquivo:** o mkcert guarda a autoridade em dois arquivos,
+> `rootCA.pem` (pode ir para o celular) e `rootCA-key.pem` (a **chave**, que
+> **nunca** sai do computador). Quem tiver a chave consegue criar certificados
+> falsos que o seu computador e o seu celular aceitariam para qualquer site.
+> Não copie, não envie e não coloque no Git.
+
+**Passo 1. Instalar o mkcert** (PowerShell comum, qualquer pasta):
+
+```powershell
+winget install FiloSottile.mkcert
+```
+
+Feche e abra o terminal de novo e confira com `mkcert -version`.
+
+**Passo 2. Criar a sua autoridade e instalá-la no Windows** (uma vez só):
+
+```powershell
+mkcert -install
+```
+
+O Windows mostra um "Aviso de segurança" perguntando se você quer instalar um
+certificado. É a sua autoridade: clique em **Sim**.
+
+**Passo 3. Criar o certificado do Meu Veículo** (pasta `meu-veiculo\frontend`).
+Descubra o IP do computador (seção 18.2) e troque `192.168.0.10` pelo seu:
+
+```powershell
+New-Item -ItemType Directory -Force certificados
+mkcert -cert-file certificados\meu-veiculo.pem -key-file certificados\meu-veiculo-chave.pem localhost 127.0.0.1 192.168.0.10
+```
+
+Esperado: `The certificate is at "certificados\meu-veiculo.pem" and the key at
+"certificados\meu-veiculo-chave.pem"`. A pasta `frontend\certificados` não vai
+para o Git (está no `.gitignore`).
+
+**Passo 4. Levar a autoridade para o celular.** Copie o `rootCA.pem` para a
+Área de Trabalho com um nome que o Android reconhece:
+
+```powershell
+Copy-Item "$(mkcert -CAROOT)\rootCA.pem" "$HOME\Desktop\meu-veiculo-ca.crt"
+```
+
+Passe o `meu-veiculo-ca.crt` para o celular (cabo USB, Google Drive ou
+e-mail para você mesma). No Android: **Configurações** → **Segurança e
+privacidade** → **Mais configurações de segurança** → **Criptografia e
+credenciais** → **Instalar um certificado** → **Certificado de CA** → **Instalar
+assim mesmo** → escolha o arquivo. Os nomes mudam um pouco conforme a marca; se
+não achar, procure "certificado" na busca das Configurações. O Android pode
+pedir que o celular tenha bloqueio de tela (PIN ou padrão). Depois de
+instalado, apague a cópia da Área de Trabalho e do Drive/e-mail (não é
+secreta, mas não precisa ficar espalhada).
+
+**Passo 5. Ajustar o `backend\.env`** e reiniciar o backend:
+
+```
+COOKIE_SEGURO=true
+URL_FRONTEND=https://192.168.0.10:4173
+```
+
+`COOKIE_SEGURO=true` faz o cookie da sessão só trafegar criptografado. Com ele
+ligado, os endereços `http://SEU-IP` (os jeitos 1 e 2 sem HTTPS) deixam de
+manter o login; no computador, `http://localhost` continua funcionando no
+Chrome, que trata `localhost` como seguro.
+
+**Passo 6. Abrir com HTTPS.** Terminal 1, backend, como sempre (seção 18.4).
+Terminal 2 (pasta `meu-veiculo\frontend`), escolha:
+
+| Comando | Para quê | Endereço no celular |
+|---|---|---|
+| `npm run app:https` | versão final, instalável (troca o `app:celular`) | `https://192.168.0.10:4173` |
+| `npm run dev:https` | desenvolvimento, atualiza ao salvar (troca o `dev:celular`) | `https://192.168.0.10:5173` |
+
+Atenção ao **`https://`**: nesse modo, o endereço com `http://` não responde.
+No celular, o Chrome deve mostrar o cadeado sem nenhum aviso. Instale pelo
+menu ⋮ → **Instalar app**: agora o ícone abre em tela cheia e a página "Sem
+conexão com o servidor" funciona, sem cabo.
+
+**Se o IP do computador mudar** (o roteador pode trocar), repita só o passo 3
+com o IP novo e ajuste o `URL_FRONTEND`. O celular não precisa de nada novo:
+a autoridade continua a mesma. Para o IP não mudar, dá para reservar o IP do
+computador nas configurações do roteador (cada modelo tem o seu jeito).
+
+**Para desfazer tudo:** no computador, `mkcert -uninstall` e apague a pasta
+`frontend\certificados`; no celular, **Criptografia e credenciais** →
+**Credenciais do usuário** → toque na autoridade "mkcert" → **Remover**; no
+`.env`, volte `COOKIE_SEGURO=false`.
+
+**Situação de teste:** testei no seu computador, com um certificado de teste
+criado por mim do mesmo jeito que o mkcert cria (autoridade própria +
+certificado para `localhost`, `127.0.0.1` e o IP): `npm run app:https` abriu
+por `https://localhost:4173` e `https://SEU-IP:4173`, entregou a página, o
+service worker e o manifesto, e a API passou pelo proxy com `no-store`; sem os
+arquivos do certificado, o comando para com a orientação desta seção. O
+certificado de teste foi apagado depois. **Não testado por mim:** o mkcert em
+si, a instalação da autoridade no seu Android e o cadeado no Chrome do celular
+(dependem do seu aparelho). Observação: o **Avast** do seu computador examina
+conexões HTTPS e por isso não deixou conferir a assinatura a partir do
+computador; no celular ele não interfere.
+
+### 18.9 O que o aplicativo instalado guarda no celular
 
 - **Instalação** = ícone e abertura em tela cheia. **Cache** = cópia de
   arquivos no aparelho. **Offline** = funcionar sem servidor. São coisas
@@ -1452,7 +1637,7 @@ testado neste projeto. Com HTTPS, use `COOKIE_SEGURO=true` no `.env`.
 - Para remover: segure o ícone → Desinstalar (ou Chrome → Configurações →
   Configurações do site → o endereço → Limpar e redefinir).
 
-### 18.9 Problemas comuns no celular
+### 18.10 Problemas comuns no celular
 
 | Sintoma | Causa provável | O que fazer |
 |---|---|---|
@@ -1464,19 +1649,24 @@ testado neste projeto. Com HTTPS, use `COOKIE_SEGURO=true` no `.env`.
 | Não aparece "Instalar app", só um atalho comum | endereço `http://192.168...` não é seguro | alternativa A ou B da seção 18.7, com `npm run app:celular` |
 | "Sem conexão com o servidor" ao abrir o app instalado | computador desligado, terminais fechados ou celular fora do Wi-Fi de casa | ligue o backend e o `npm run app:celular`; toque em "Tentar de novo" |
 | Depois de atualizar o código, o celular mostra a versão antiga | a página antiga continua aberta | feche o app (ou a aba) e abra de novo |
-| `Port 4173 is already in use` | outro `app:celular` aberto | feche o outro terminal ou use `Ctrl + C` nele |
+| `Port 4173 is already in use` | outro `app:celular` ou `app:https` aberto | feche o outro terminal ou use `Ctrl + C` nele |
+| `HTTPS: não encontrei meu-veiculo.pem...` ao rodar `app:https` ou `dev:https` | certificado ainda não criado ou na pasta errada | passo 3 da seção 18.8, na pasta `frontend` |
+| Celular mostra "Sua conexão não é particular" em `https://...` | autoridade não instalada no celular, ou o IP mudou depois de criar o certificado | passos 3 e 4 da seção 18.8 |
+| Com HTTPS, o endereço `http://...:4173` não abre | nesse modo só existe `https://` | digite `https://` |
+| Entra, mas volta para a tela de login ao navegar | `COOKIE_SEGURO=true` com um endereço `http://SEU-IP` | use o endereço `https://` (ou volte `COOKIE_SEGURO=false`) |
+| No computador, o Chrome avisa "Avast Untrusted Root" em `https://...` | o Avast não reconhece a autoridade (mkcert sem o `-install`) | rode `mkcert -install` de novo e reabra o Chrome; ou use `http://localhost:5173` no computador |
 
 ## 19. O que foi testado e o que depende do seu ambiente
 
-Situação em 02/10/2026, fim da etapa 10. "Testado" quer dizer que o teste foi
+Situação em 02/10/2026, fim da etapa 11. "Testado" quer dizer que o teste foi
 executado e passou; nada aqui foi marcado só porque o código existe.
 
 ### 19.1 Testes automáticos (executados)
 
 | Suíte | Comando (pasta) | Resultado |
 |---|---|---|
-| Backend, no PostgreSQL de teste (domains, views e triggers reais; nada de SQLite) | `.\.venv\Scripts\python.exe -m pytest` (`backend`) | 730 passaram, 0 falharam |
-| Frontend (telas, cálculos de tela, PWA) | `npm test` (`frontend`) | 207 passaram, 0 falharam |
+| Backend, no PostgreSQL de teste (domains, views e triggers reais; nada de SQLite) | `.\.venv\Scripts\python.exe -m pytest` (`backend`) | 780 passaram, 0 falharam |
+| Frontend (telas, cálculos de tela, PWA) | `npm test` (`frontend`) | 218 passaram, 0 falharam |
 | Tipos do TypeScript | `npm run typecheck` (`frontend`) | sem erros |
 | Versão final | `npm run build` (`frontend`) | gerada (só o aviso de tamanho, seção 7) |
 
@@ -1531,9 +1721,9 @@ com a versão final (build + preview):
 | Regra do firewall e rede Privada | exige PowerShell como administrador | seção 18.3 |
 | **Instalar** o app no Android | exige contexto seguro no celular (cabo USB ou opção do Chrome) | seção 18.7 |
 | **Câmera** do celular ("Tirar foto") e fotos HEIC de iPhone | depende do aparelho; a conversão de HEIC está testada no backend | enviar uma foto pela câmera e conferir a galeria |
-| Envio real de e-mail (SMTP) | depende da sua conta e da "senha de app" | seção 10.2 |
+| Envio real de e-mail pelo Gmail | depende da sua conta e da "senha de app"; o envio por SMTP está testado com servidor falso | seção 10.2 (`gerenciar.py testar-email`) |
 | Link do e-mail aberto no celular | depende de `URL_FRONTEND` com o IP | seção 18.6 |
-| HTTPS com certificado próprio | não configurado | seção 18.7 |
+| HTTPS com certificado próprio (mkcert) | configurado e testado no computador com certificado de teste; mkcert e celular dependem de você | seção 18.8 |
 | iPhone/Safari | fora do aparelho escolhido (Android + Chrome) | compatibilidade não validada |
 | Uso fora de casa | exigiria hospedagem com HTTPS, fora do escopo | — |
 

@@ -20,6 +20,8 @@ Comandos:
     carregar-exemplo         grava dados de exemplo no banco de DEMONSTRAÇÃO
                              (DB_NOME_DEMO); nunca no de desenvolvimento.
                              --recomecar apaga o banco de demonstração antes
+    testar-email DESTINO     envia uma mensagem de teste com a configuração
+                             de e-mail do .env e explica o erro, se houver
 
 Use --teste para agir no banco de teste em vez do de desenvolvimento.
 """
@@ -28,7 +30,9 @@ import argparse
 import getpass
 import os
 import sys
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import psycopg
 import sqlalchemy.exc
@@ -43,7 +47,15 @@ from app.config import FUSO_HORARIO, obter_configuracoes
 from app.repositories.arquivo_foto_repository import ArquivoFotoRepository
 from app.repositories.foto_repository import FotoRepository
 from app.repositories.usuario_repository import UsuarioRepository
+from app.services.email_service import (
+    EnviadorArquivo,
+    MensagemEmail,
+    conferir_configuracao_smtp,
+    criar_enviador,
+    explicar_falha_de_envio,
+)
 from app.services.erros import ErroDeNegocio
+from app.services.validacao import normalizar_email
 from app.services.importacao_fotos_service import ImportacaoFotosService
 from app.services.usuario_service import UsuarioService
 
@@ -267,6 +279,50 @@ def cmd_carregar_exemplo(args: argparse.Namespace) -> None:
     print("Para abrir o sistema com estes dados, veja a seção 20 do README.")
 
 
+def cmd_testar_email(args: argparse.Namespace) -> None:
+    """Não usa o banco. Mostra a configuração sem a senha e, se o envio
+    falhar, explica o motivo (o fluxo de "Esqueci a senha" não mostra erros)."""
+    cfg = obter_configuracoes()
+    try:
+        destino = normalizar_email(args.destino)
+    except ErroDeNegocio:
+        raise SystemExit(f"ERRO: '{args.destino}' não é um e-mail válido.")
+    print(f"Modo: {cfg.email_modo}")
+    if cfg.email_modo == "smtp":
+        print(f"Servidor: {cfg.smtp_host or '(vazio)'}, porta {cfg.smtp_porta}, "
+              f"segurança {cfg.smtp_seguranca}")
+        print(f"Usuário: {cfg.smtp_usuario or '(nenhum)'}; senha: "
+              f"{'preenchida' if cfg.smtp_senha.get_secret_value() else 'vazia'}")
+    print(f"Remetente: {cfg.email_remetente}")
+    print(f"Links dos e-mails começam com: {cfg.url_frontend.rstrip('/')}")
+    problemas = conferir_configuracao_smtp(cfg)
+    if problemas:
+        print("\nCorrija no backend\\.env antes de testar:", file=sys.stderr)
+        for problema in problemas:
+            print(f"- {problema}", file=sys.stderr)
+        raise SystemExit(1)
+    agora = datetime.now(ZoneInfo(FUSO_HORARIO)).strftime("%d/%m/%Y %H:%M")
+    mensagem = MensagemEmail(
+        para=destino,
+        assunto="Meu Veículo: e-mail de teste",
+        texto=("Olá!\n\nEste é um e-mail de teste do Meu Veículo, enviado em "
+               f"{agora} pelo comando gerenciar.py testar-email.\n"
+               "Se ele chegou, a recuperação de senha e os convites também vão chegar.\n\n"
+               f"Endereço do sistema: {cfg.url_frontend.rstrip('/')}\n"),
+    )
+    enviador = criar_enviador(cfg)
+    try:
+        resultado = enviador.enviar(mensagem)
+    except Exception as erro:  # noqa: BLE001 - qualquer falha vira orientação
+        print(f"\nERRO: o e-mail não foi enviado. {explicar_falha_de_envio(erro)}", file=sys.stderr)
+        raise SystemExit(1)
+    if isinstance(enviador, EnviadorArquivo):
+        print(f"\nModo arquivo: nada saiu do computador. Mensagem gravada em {resultado}")
+        print("Para enviar de verdade, use EMAIL_MODO=smtp (README, seção 10.2).")
+    else:
+        print(f"\nEnviado para {destino}. Confira a caixa de entrada (e a pasta de spam).")
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Comandos do banco do Meu Veículo.")
     sub = parser.add_subparsers(dest="comando", required=True)
@@ -279,16 +335,19 @@ def main(argv: list[str] | None = None) -> None:
         ("promover-admin", cmd_promover_admin, "torna administradora uma conta já cadastrada"),
         ("importar-fotos", cmd_importar_fotos, "copia para o banco fotos que ainda estão na pasta"),
         ("carregar-exemplo", cmd_carregar_exemplo, "grava dados de exemplo no banco de demonstração"),
+        ("testar-email", cmd_testar_email, "envia um e-mail de teste com a configuração do .env"),
     ):
         p = sub.add_parser(nome, help=ajuda)
         p.set_defaults(funcao=funcao)
-        if nome not in ("criar-bancos", "carregar-exemplo"):
+        if nome not in ("criar-bancos", "carregar-exemplo", "testar-email"):
             p.add_argument("--teste", action="store_true", help="usar o banco de teste")
         if nome == "promover-admin":
             p.add_argument("email", help="e-mail da conta (criada antes pela tela 'Criar conta')")
         if nome == "carregar-exemplo":
             p.add_argument("--recomecar", action="store_true",
                            help="apaga tudo do banco de demonstração antes de carregar")
+        if nome == "testar-email":
+            p.add_argument("destino", help="e-mail que vai receber a mensagem de teste")
         if nome == "importar-fotos":
             p.add_argument("--pasta", type=Path, default=None,
                            help="pasta das fotos (padrão: PASTA_FOTOS do .env)")

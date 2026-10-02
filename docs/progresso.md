@@ -15,6 +15,8 @@ Status possíveis: **pendente**, **em andamento**, **entregue** (código pronto 
 | 8 | Projetos e fotos de antes/depois | validada |
 | 9 | Histórico, tela inicial e administração | validada |
 | 10 | Revisão integrada, acesso pelo celular e README final | validada |
+| 11 | E-mail de verdade (Gmail) e HTTPS na rede de casa | entregue |
+| 12 | Preparação da apresentação do TCC (dados de exemplo, roteiro, resumo para o texto) | pendente |
 
 A ordem pode ser ajustada na etapa 0 para respeitar dependências; registre o motivo em `decisoes.md`.
 
@@ -280,3 +282,18 @@ A ordem pode ser ajustada na etapa 0 para respeitar dependências; registre o mo
 - Arquivos criados: `backend/app/services/nivel_tanque.py`. Alterados: `backend/app/{services/abastecimento_service, services/painel_service, schemas/abastecimento_schema, schemas/painel_schema, controllers/abastecimento_controller}.py`, `backend/tests/test_tanque_api.py` (8 novos); `frontend/src/{types/abastecimento.ts, types/painel.ts, components/PecasTanque.tsx, components/AbaCombustivel.tsx, pages/InicioPage.tsx, pages/AbastecimentoFormPage.tsx, styles/painel.css}` e testes `Tanque.test.tsx` (4 novos), `Combustivel.test.tsx`, `Painel.test.tsx`; `README.md` (15.3 e 17.1), `docs/decisoes.md`, `docs/progresso.md`.
 - Testes executados pelo Claude: `.\.venv\Scripts\python.exe -m pytest`: 759 passaram, 0 falharam (751 + 8 novos). `npm test`: 218 passaram, 0 falharam (214 + 4 novos); `npm run typecheck` sem erros; `npm run build` ok.
 - Conferido no Chrome (banco de TESTE com os dados de exemplo): Início e aba Combustível com "≈ 3/4" (marcação 3,5/4 em 01/10 e 32 km rodados a 8,6 km/L); formulário de abastecimento com "Último nível: 3,5/4 em 01/10/2026"; log sem 5xx.
+- Validado pela Paula (02/10/2026): testou e fez o commit (`ec58da5 terminando abastecimento`).
+
+### Etapa 11 — E-mail de verdade (Gmail) e HTTPS na rede de casa (02/10/2026)
+- Pedido da Paula: caminhos 1 (o que dependia do ambiente: SMTP real e HTTPS) e 2 (apresentação, que vira a etapa 12). Sem migration nova (o banco continua na 0013).
+- Ficou funcionando (código + testes do Claude):
+  - `gerenciar.py testar-email DESTINO`: envia uma mensagem de teste com o `.env` atual, mostra a configuração sem a senha, confere o `.env` antes de conectar e explica a falha em português (senha de app, servidor, porta × segurança, remetente).
+  - HTTPS: `npm run dev:https` (5173) e `npm run app:https` (4173) com o certificado do mkcert em `frontend\certificados\` (fora do Git); sem o certificado, o comando para com a orientação. Os comandos sem HTTPS não mudaram.
+  - README: 10.2 reescrita (Gmail passo a passo, `testar-email`, tabela de erros), nova 18.8 (mkcert, autoridade no Android, `COOKIE_SEGURO`, desfazer), 18.6, 18.7 (alternativa C), 18.10 (problemas novos) e 19.
+- Arquivos criados: `backend/tests/test_envio_smtp.py`. Alterados: `backend/{app/services/email_service.py, gerenciar.py, .env.example, tests/test_auth_api.py}`, `frontend/{vite.config.ts, package.json}`, `.gitignore`, `README.md`, `CLAUDE.md`, `docs/decisoes.md`, `docs/progresso.md`.
+- Testes executados pelo Claude:
+  - `.\.venv\Scripts\python.exe -m pytest` (backend, PostgreSQL de teste): 780 passaram, 0 falharam (759 anteriores + 19 do envio por SMTP com servidor falso + 2 do cookie seguro). Na primeira rodada do arquivo novo, 1 falhou por erro no próprio teste (parâmetro repetido), corrigido.
+  - `npm test`: 218 passaram, 0 falharam; `npm run typecheck` sem erros; `npm run build` ok.
+  - HTTPS no computador, com autoridade e certificado de teste criados por mim (openssl, mesmo formato do mkcert; apagados depois): `vite preview --mode https` respondeu em `https://localhost:4173` e `https://192.168.100.9:4173` (página, `sw.js`, manifesto e `/api/saude` pelo proxy com `no-store`); `http://` na 4173 não responde nesse modo; sem certificado, a mensagem de orientação aparece. A assinatura foi conferida com `openssl verify`; a conferência pela rede não foi possível porque o Avast do computador intercepta HTTPS. O `npm run dev` da Paula na 5173 não foi tocado; só `GET /api/saude` foi lido do backend de desenvolvimento.
+- Depende de validação da Paula: senha de app e envio pelo Gmail (`testar-email` e "Esqueci a senha"); mkcert instalado, autoridade no Android, cadeado e instalação do app pelo `https://IP:4173`; `COOKIE_SEGURO=true` no uso real.
+- Pendências para a próxima etapa (12): banco `meu_veiculo_demo` (criar e carregar), roteiro da apresentação, resumo de arquitetura e decisões para o texto do TCC.

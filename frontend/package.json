@@ -7,6 +7,8 @@
     "dev": "vite",
     "dev:celular": "vite --host",
     "app:celular": "npm run build && vite preview --host",
+    "dev:https": "vite --host --mode https",
+    "app:https": "npm run build && vite preview --host --mode https",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",

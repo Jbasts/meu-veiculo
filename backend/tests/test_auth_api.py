@@ -228,3 +228,37 @@ def test_nova_senha_igual_a_atual_e_recusada(banco, aparelho):
     resposta = trocar_senha(aparelho, nova=SENHA_BOA)
     assert resposta.status_code == 422
     assert "diferente da atual" in resposta.json()["mensagem"]
+
+
+# ------------------------------------------------------- HTTPS (etapa 11)
+
+def test_cookie_seguro_com_https(banco):
+    """COOKIE_SEGURO=true (README 18.8): o cookie só trafega em HTTPS e a sessão
+    continua funcionando por https; os links dos e-mails usam URL_FRONTEND."""
+    from fastapi.testclient import TestClient
+
+    from app.config import obter_configuracoes
+    from app.dependencias import obter_enviador_email
+    from tests.auth_utils import CABECALHOS_APP, pedir_recuperacao
+
+    cfg = obter_configuracoes().model_copy(update={
+        "cookie_seguro": True, "url_frontend": "https://192.168.0.10:4173"})
+    app.dependency_overrides[obter_configuracoes] = lambda: cfg
+    caixa = CaixaDeEntrada()
+    app.dependency_overrides[obter_enviador_email] = lambda: caixa
+    celular = TestClient(app, headers=CABECALHOS_APP, base_url="https://testserver")
+
+    resposta = cadastrar(celular)
+    assert resposta.status_code == 201
+    cookie = resposta.headers["set-cookie"].lower()
+    assert "secure" in cookie and "httponly" in cookie and "samesite=lax" in cookie
+    assert celular.get("/api/auth/eu").status_code == 200
+    assert "secure" in celular.post("/api/auth/sair").headers["set-cookie"].lower()
+
+    assert pedir_recuperacao(celular).status_code in (200, 202)
+    assert "https://192.168.0.10:4173/redefinir-senha#token=" in caixa.mensagens[-1].texto
+
+
+def test_sem_cookie_seguro_o_padrao_continua_em_http(banco, aparelho):
+    resposta = cadastrar(aparelho)
+    assert "secure" not in resposta.headers["set-cookie"].lower()
