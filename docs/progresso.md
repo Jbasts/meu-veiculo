@@ -15,7 +15,7 @@ Status possíveis: **pendente**, **em andamento**, **entregue** (código pronto 
 | 8 | Projetos e fotos de antes/depois | validada |
 | 9 | Histórico, tela inicial e administração | validada |
 | 10 | Revisão integrada, acesso pelo celular e README final | validada |
-| 11 | E-mail de verdade (Gmail) e HTTPS na rede de casa | entregue |
+| 11 | E-mail de verdade (Gmail) e HTTPS na rede de casa | validada |
 | 12 | Preparação da apresentação do TCC (dados de exemplo, roteiro, resumo para o texto) | pendente |
 
 A ordem pode ser ajustada na etapa 0 para respeitar dependências; registre o motivo em `decisoes.md`.
@@ -297,3 +297,19 @@ A ordem pode ser ajustada na etapa 0 para respeitar dependências; registre o mo
   - HTTPS no computador, com autoridade e certificado de teste criados por mim (openssl, mesmo formato do mkcert; apagados depois): `vite preview --mode https` respondeu em `https://localhost:4173` e `https://192.168.100.9:4173` (página, `sw.js`, manifesto e `/api/saude` pelo proxy com `no-store`); `http://` na 4173 não responde nesse modo; sem certificado, a mensagem de orientação aparece. A assinatura foi conferida com `openssl verify`; a conferência pela rede não foi possível porque o Avast do computador intercepta HTTPS. O `npm run dev` da Paula na 5173 não foi tocado; só `GET /api/saude` foi lido do backend de desenvolvimento.
 - Depende de validação da Paula: senha de app e envio pelo Gmail (`testar-email` e "Esqueci a senha"); mkcert instalado, autoridade no Android, cadeado e instalação do app pelo `https://IP:4173`; `COOKIE_SEGURO=true` no uso real.
 - Pendências para a próxima etapa (12): banco `meu_veiculo_demo` (criar e carregar), roteiro da apresentação, resumo de arquitetura e decisões para o texto do TCC.
+- Validado pela Paula (02/10/2026): testou e fez o commit.
+
+### Ajuste depois da etapa 11 — "E-mail não existente, digite novamente" (02/10/2026)
+- Pedido da Paula: na recuperação de senha, procurar o e-mail no banco e avisar quando não existir. Troca a regra da linha 42 do `requisitos.md` e a decisão de 29/09 (registrado em `decisoes.md`; o Claude explicou o risco e recomendou outra opção, a Paula escolheu esta). Sem migration.
+- Ficou funcionando (código + testes do Claude): `POST /api/auth/recuperar-senha` responde 404 "E-mail não existente, digite novamente." no campo e-mail; conta desativada 403; limite de 3 por e-mail agora avisa (429); conta ativa 202 "Enviamos um link...". O limite de 10 por hora por endereço de rede conta também os e-mails inexistentes. A tela mostra o aviso no campo e deixa corrigir e enviar de novo (sem mudança no componente; só a mensagem vem da API).
+- Arquivos alterados: `backend/app/{services/autenticacao_service.py, controllers/auth_controller.py}`, `backend/tests/test_recuperacao_senha.py`, `frontend/src/pages/Conta.test.tsx`, `README.md` (9.1, 9.2, 10.2), `docs/decisoes.md`, `docs/progresso.md`.
+- Testes executados pelo Claude:
+  - `tests/test_recuperacao_senha.py`, `test_auth_api.py`, `test_admin_api.py`: 86 passaram, 1 falhou (`test_dois_admins_rebaixando_um_ao_outro_ao_mesmo_tempo_deixa_um_admin`, teste antigo de concorrência que não passa pela recuperação; rodado sozinho 5 vezes, passou nas 5 — falha intermitente a investigar).
+  - Suíte completa `.\.venv\Scripts\python.exe -m pytest`: 775 passaram, 6 falharam. As 6 (`test_permissoes` ×3 do `promover-admin`, `test_carga_exemplo`, `test_fotos_api` do `importar-fotos`, `test_api_saude` sem banco) dependem do `backend\.env`: ele foi regravado às 19:56 sem a parte do banco (`DB_HOST` ... `DB_SENHA` ... `PASTA_FOTOS`), e os comandos do `gerenciar.py` exigem `DB_SENHA`. Não é efeito da mudança; rodar de novo depois que a Paula restaurar essas linhas.
+  - `npm test`: 219 passaram, 0 falharam (218 + 1 novo); `npm run typecheck` sem erros.
+
+### Ajuste — recuperação de senha sem limite de tentativas (02/10/2026)
+- Pedido da Paula: tirar a regra de tentativas da recuperação; pode tentar várias vezes e só aparece o aviso de e-mail inexistente. O login continua com limite. Sem migration.
+- Arquivos alterados: `backend/app/{services/autenticacao_service.py, controllers/auth_controller.py, routes/auth_routes.py}`, `backend/tests/test_recuperacao_senha.py` (2 testes de limite removidos, 1 trocado por `test_sem_limite_de_pedidos`), `README.md` (9.1, 9.2), `docs/decisoes.md`, `docs/progresso.md`.
+- Testes executados pelo Claude: `.\.venv\Scripts\python.exe -m pytest`: 773 passaram, 6 falharam (as mesmas 6 do ajuste anterior, que dependem do `DB_SENHA` ainda ausente no `backend\.env`; 775 - 3 testes de limite removidos + 1 novo = 773). `npm test`: 219 passaram, 0 falharam; `npm run typecheck` sem erros.
+- Pendente da Paula: restaurar a parte do banco no `backend\.env` e rodar `pytest --lf`.

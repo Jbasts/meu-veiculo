@@ -14,8 +14,7 @@ Links de uso único (tabela recuperacao_senha), consumidos em redefinir_senha:
 
 Limites de tentativas (contados no banco, valem mesmo reiniciando a API):
 - login: 5 erros por e-mail ou 20 erros por endereço de rede em 15 minutos;
-- recuperação: 3 pedidos por e-mail (silencioso, sem revelar nada) ou
-  10 por endereço de rede (resposta 429) em 1 hora.
+- recuperação: sem limite (decisão da Paula, 02/10/2026).
 """
 
 from dataclasses import dataclass
@@ -23,7 +22,7 @@ from datetime import timedelta
 from typing import Protocol
 
 from app.entities.sessao import Sessao, SessaoAtual
-from app.entities.tentativa_acesso import TIPO_LOGIN, TIPO_RECUPERACAO
+from app.entities.tentativa_acesso import TIPO_LOGIN
 from app.entities.usuario import Usuario
 from app.repositories.erros import EmailJaCadastrado
 from app.services.email_service import MensagemEmail
@@ -33,6 +32,7 @@ from app.services.erros import (
     DadosInvalidos,
     MuitasTentativas,
     NaoAutenticado,
+    NaoEncontrado,
 )
 from app.services.senha_service import SenhaService
 from app.services.tokens import gerar_token, hash_de, token_com_formato_valido
@@ -42,9 +42,7 @@ LIMITE_LOGIN_POR_EMAIL = 5
 LIMITE_LOGIN_POR_IP = 20
 JANELA_LOGIN = timedelta(minutes=15)
 
-LIMITE_RECUPERACAO_POR_EMAIL = 3
-LIMITE_RECUPERACAO_POR_IP = 10
-JANELA_RECUPERACAO = timedelta(hours=1)
+MENSAGEM_EMAIL_INEXISTENTE = "E-mail não existente, digite novamente."
 
 MENSAGEM_LOGIN_INVALIDO = "E-mail ou senha incorretos."
 MENSAGEM_LINK_INVALIDO = (
@@ -190,24 +188,18 @@ class AutenticacaoService:
             self._recuperacoes.cancelar_pendentes(usuario.id)
 
     # --------------------------------------------------------------- recuperação
-    def solicitar_recuperacao(self, email: str, ip: str | None) -> MensagemEmail | None:
-        """Devolve o e-mail a enviar, ou None. A resposta da API é a mesma nos
-        dois casos, para não revelar se o e-mail tem conta."""
-        ip = _ip_curto(ip)
-        if ip and self._tentativas.contar(TIPO_RECUPERACAO, JANELA_RECUPERACAO,
-                                          ip=ip) >= LIMITE_RECUPERACAO_POR_IP:
-            raise MuitasTentativas("Muitos pedidos de recuperação. Aguarde uma hora e tente de novo.")
+    def solicitar_recuperacao(self, email: str) -> MensagemEmail:
+        """Devolve o e-mail a enviar. Decisões da Paula (02/10/2026): e-mail sem
+        conta recebe "E-mail não existente, digite novamente." (substitui a
+        resposta sempre igual) e não há limite de pedidos: pode tentar quantas
+        vezes quiser; cada pedido válido gera um link novo e invalida o anterior."""
         email = normalizar_email(email)
-        chave = hash_de(email)
-        excedeu = self._tentativas.contar(TIPO_RECUPERACAO, JANELA_RECUPERACAO,
-                                          chave_email=chave) >= LIMITE_RECUPERACAO_POR_EMAIL
-        with self._uow.transacao():
-            self._tentativas.registrar(TIPO_RECUPERACAO, chave, ip, sucesso=True)
-        if excedeu:
-            return None
         usuario = self._usuarios.buscar_por_email(email)
-        if usuario is None or not usuario.ativo:
-            return None
+        if usuario is None:
+            raise NaoEncontrado(MENSAGEM_EMAIL_INEXISTENTE, campo="email")
+        if not usuario.ativo:
+            raise AcessoNegado("Esta conta está desativada. Fale com o administrador do sistema.",
+                               campo="email")
         with self._uow.transacao():
             return self.link_de_recuperacao(usuario)
 

@@ -28,8 +28,7 @@ NOME_COOKIE = "mv_sessao"
 CAMINHO_COOKIE = "/api"
 
 MENSAGEM_RECUPERACAO = (
-    "Se houver uma conta com esse e-mail, enviamos um link para criar uma senha nova. "
-    "Confira a caixa de entrada e o spam."
+    "Enviamos um link para criar uma senha nova. Confira a caixa de entrada e o spam."
 )
 
 
@@ -93,12 +92,11 @@ class AuthController:
             mensagem="Senha alterada. Os outros aparelhos conectados precisarão entrar de novo."
         )
 
-    def solicitar_recuperacao(self, dados: RecuperarSenhaEntrada, requisicao: Request,
+    def solicitar_recuperacao(self, dados: RecuperarSenhaEntrada,
                               tarefas: BackgroundTasks) -> MensagemResposta:
-        mensagem = self._service.solicitar_recuperacao(dados.email, ip_de(requisicao))
-        if mensagem is not None:
-            # Enviado depois da resposta: o tempo de resposta não revela se o e-mail existe.
-            tarefas.add_task(enviar_sem_interromper, self._enviador, mensagem)
+        mensagem = self._service.solicitar_recuperacao(dados.email)
+        # Enviado depois da resposta: a tela não espera o servidor de e-mail.
+        tarefas.add_task(enviar_sem_interromper, self._enviador, mensagem)
         return MensagemResposta(mensagem=MENSAGEM_RECUPERACAO)
 
     def redefinir_senha(self, dados: RedefinirSenhaEntrada, resposta: Response) -> MensagemResposta:

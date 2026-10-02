@@ -434,12 +434,19 @@ não impede nada.
 | Sair | encerra a sessão deste aparelho no banco; o token deixa de valer mesmo que alguém o tenha copiado. |
 | Trocar senha | exige a senha atual; os outros aparelhos saem, este continua. |
 | Conta desativada | perde o acesso na próxima ação, mesmo com uma sessão aberta antes. |
-| Limite de tentativas | login: 5 erros por e-mail ou 20 por endereço de rede em 15 minutos. Recuperação: 3 pedidos por e-mail por hora (sem avisar, para não revelar a conta) ou 10 por endereço de rede (aviso "Muitos pedidos"). |
+| Limite de tentativas | login: 5 erros por e-mail ou 20 por endereço de rede em 15 minutos. Recuperação: **sem limite** (decisão sua): pode tentar quantas vezes quiser; e-mail errado só mostra o aviso. |
 | Requisições forjadas | toda gravação exige o cabeçalho `X-MV-Requisicao: 1`, que só o app envia. Outro site não consegue acrescentar esse cabeçalho. |
 
 ### 9.2 Recuperação de senha
 
-1. Em "Esqueci minha senha", a pessoa informa o e-mail. A resposta é **sempre a mesma**, exista ou não a conta.
+1. Em "Esqueci minha senha", a pessoa informa o e-mail. O sistema procura o e-mail no banco:
+   - **não existe**: a tela avisa **"E-mail não existente, digite novamente."** no campo, e a pessoa corrige e envia de novo;
+   - **conta desativada**: "Esta conta está desativada. Fale com o administrador do sistema.";
+   - **existe e está ativa**: "Enviamos um link para criar uma senha nova. Confira a caixa de entrada e o spam."
+
+   Não há limite de pedidos: dá para errar e tentar de novo quantas vezes quiser. Cada pedido certo envia um link novo e invalida o anterior (só o último e-mail vale).
+
+   Isso foi decisão sua (02/10/2026) e **troca** duas regras do pedido original (`requisitos.md`, linha 42): "evite revelar se um e-mail está cadastrado" e "proteja a recuperação contra tentativas excessivas". Agora qualquer pessoa consegue saber se um e-mail tem conta e pedir muitos links seguidos. O login continua com limite de tentativas.
 2. Se a conta existe e está ativa, o sistema envia um link `http://localhost:5173/redefinir-senha#token=...`, válido por 60 minutos (`RECUPERACAO_MINUTOS`) e de **uso único**. Um link novo invalida os anteriores.
 3. O banco guarda só o hash do token. A parte depois do `#` não é enviada a nenhum servidor, e a tela a apaga do endereço assim que abre.
 4. Ao salvar a senha nova, o link é consumido e a senha trocada **na mesma transação**. Se dois pedidos chegarem juntos com o mesmo link, o banco faz um esperar o outro, e só o primeiro funciona (há teste automático disso).
@@ -563,8 +570,8 @@ segurança trocadas, remetente diferente do usuário).
 
 **Passo 6. Teste pelo sistema.** Reinicie o backend (ele só lê o `.env` ao
 iniciar), abra **Esqueci a senha**, informe o e-mail de uma conta cadastrada e
-confira a caixa de entrada. Por segurança, a tela mostra sempre a mesma
-mensagem, exista a conta ou não; se o envio falhar, o terminal do backend
+confira a caixa de entrada. A tela confirma o pedido assim que o e-mail é
+encontrado, antes do envio terminar; se o envio falhar, o terminal do backend
 mostra só `Falha ao enviar e-mail (tipo do erro)`, sem destinatário nem
 conteúdo. Para descobrir o motivo, use o `testar-email` do passo 5.
 

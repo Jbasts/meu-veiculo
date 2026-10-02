@@ -52,9 +52,9 @@ def alterar_senha(dados: AlterarSenhaEntrada, atual: SessaoAtualDep, controller:
 
 @router.post("/recuperar-senha", response_model=MensagemResposta, status_code=202,
              responses=ERROS, summary="Pedir link para criar senha nova")
-def recuperar_senha(dados: RecuperarSenhaEntrada, requisicao: Request, tarefas: BackgroundTasks,
+def recuperar_senha(dados: RecuperarSenhaEntrada, tarefas: BackgroundTasks,
                     controller: ControllerDep):
-    return controller.solicitar_recuperacao(dados, requisicao, tarefas)
+    return controller.solicitar_recuperacao(dados, tarefas)
 
 
 @router.post("/redefinir-senha", response_model=MensagemResposta, responses=ERROS,

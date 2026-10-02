@@ -60,12 +60,20 @@ def test_pedido_para_email_cadastrado_envia_link(banco, conta, caixa):
     assert caixa.ultimo_token() not in valor_sql(banco, "SELECT token_hash FROM recuperacao_senha")
 
 
-def test_resposta_nao_revela_se_o_email_existe(banco, conta, caixa):
+def test_email_sem_conta_pede_para_digitar_de_novo(banco, conta, caixa):
+    """Decisão da Paula (02/10/2026): substitui a resposta sempre igual."""
     existe = pedir_recuperacao(novo_aparelho(), "paula@email.com")
-    nao_existe = pedir_recuperacao(novo_aparelho(), "ninguem@email.com")
-    assert existe.status_code == nao_existe.status_code == 202
-    assert existe.json() == nao_existe.json()
+    assert existe.status_code == 202
+    assert existe.json()["mensagem"].startswith("Enviamos um link")
+
+    nao_existe = pedir_recuperacao(novo_aparelho(), "paula@gmial.com")
+    assert nao_existe.status_code == 404
+    assert nao_existe.json()["mensagem"] == "E-mail não existente, digite novamente."
+    assert nao_existe.json()["campos"] == {"email": "E-mail não existente, digite novamente."}
     assert len(caixa.mensagens) == 1  # só a conta real recebeu
+    assert valor_sql(banco, "SELECT count(*) FROM recuperacao_senha") == 1
+
+
 
 
 def test_link_valido_troca_a_senha_e_encerra_todas_as_sessoes(banco, conta, caixa):
@@ -125,22 +133,28 @@ def test_conta_desativada_nao_recebe_nem_usa_link(banco, conta, caixa):
     token = caixa.ultimo_token()
     executar_sql(banco, "UPDATE usuario SET ativo = FALSE")
     assert redefinir(novo_aparelho(), token).status_code == 422
-    pedir_recuperacao(novo_aparelho())
+    resposta = pedir_recuperacao(novo_aparelho())
+    assert resposta.status_code == 403
+    assert "desativada" in resposta.json()["mensagem"]
     assert len(caixa.mensagens) == 1  # nenhum e-mail novo
 
 
-def test_limite_de_pedidos_por_email_e_silencioso(banco, conta, caixa):
-    respostas = [pedir_recuperacao(novo_aparelho()) for _ in range(5)]
+def test_sem_limite_de_pedidos(banco, conta, caixa):
+    """Decisão da Paula (02/10/2026): sem limite na recuperação. Errar muitas
+    vezes só mostra o aviso; cada pedido certo envia um link novo, e só o
+    último vale."""
+    for i in range(15):
+        resposta = pedir_recuperacao(novo_aparelho(), f"errado{i}@email.com")
+        assert resposta.status_code == 404
+        assert resposta.json()["mensagem"] == "E-mail não existente, digite novamente."
+    respostas = [pedir_recuperacao(novo_aparelho()) for _ in range(6)]
     assert {r.status_code for r in respostas} == {202}
-    assert len({r.text for r in respostas}) == 1
-    assert len(caixa.mensagens) == 3
+    assert len(caixa.mensagens) == 6
+    assert valor_sql(banco, "SELECT count(*) FROM tentativa_acesso WHERE tipo = 'recuperacao'") == 0
+    assert redefinir(novo_aparelho(), caixa.mensagens[0].texto.split("#token=")[1].split()[0]).status_code == 422
+    assert redefinir(novo_aparelho(), caixa.ultimo_token()).status_code == 200
 
 
-def test_limite_de_pedidos_por_endereco_de_rede(banco, conta):
-    for i in range(10):
-        assert pedir_recuperacao(novo_aparelho(), f"pessoa{i}@email.com").status_code == 202
-    resposta = pedir_recuperacao(novo_aparelho(), "mais.uma@email.com")
-    assert resposta.status_code == 429
 
 
 # ----------------------------------------------------- transação e concorrência

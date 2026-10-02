@@ -131,13 +131,40 @@ describe("Criar conta", () => {
 });
 
 describe("Recuperar senha", () => {
-  it("mostra a mesma confirmação, exista ou não a conta", async () => {
-    const mensagem = "Se houver uma conta com esse e-mail, enviamos um link.";
+  it("e-mail cadastrado: mostra a confirmação do envio", async () => {
+    const mensagem = "Enviamos um link para criar uma senha nova. Confira a caixa de entrada e o spam.";
     apiFalsa({ ...NAO_LOGADO, "POST /api/auth/recuperar-senha": () => json(202, { mensagem }) });
     renderizarApp("/esqueci-senha");
     await userEvent.type(await screen.findByLabelText("E-mail"), "paula@email.com");
     await userEvent.click(screen.getByRole("button", { name: "Enviar link" }));
     expect(await screen.findByText(mensagem)).toBeInTheDocument();
+  });
+
+  it("e-mail sem conta: avisa no campo e deixa digitar de novo", async () => {
+    const mensagem = "E-mail não existente, digite novamente.";
+    const enviados: string[] = [];
+    apiFalsa({
+      ...NAO_LOGADO,
+      "POST /api/auth/recuperar-senha": (corpo) => {
+        const { email } = corpo as { email: string };
+        enviados.push(email);
+        return email === "paula@gmail.com"
+          ? json(202, { mensagem: "Enviamos um link para criar uma senha nova." })
+          : json(404, { mensagem, campos: { email: mensagem } });
+      },
+    });
+    renderizarApp("/esqueci-senha");
+    const campoEmail = await screen.findByLabelText("E-mail");
+    await userEvent.type(campoEmail, "paula@gmial.com");
+    await userEvent.click(screen.getByRole("button", { name: "Enviar link" }));
+    await waitFor(() => expect(campoEmail).toHaveAttribute("aria-invalid", "true"));
+    expect(screen.getAllByText(mensagem).length).toBeGreaterThan(0);
+
+    await userEvent.clear(campoEmail);
+    await userEvent.type(campoEmail, "paula@gmail.com");
+    await userEvent.click(screen.getByRole("button", { name: "Enviar link" }));
+    expect(await screen.findByText("Enviamos um link para criar uma senha nova.")).toBeInTheDocument();
+    expect(enviados).toEqual(["paula@gmial.com", "paula@gmail.com"]);
   });
 
   it("sem token no endereço, avisa que o link está incompleto", async () => {
