@@ -15,9 +15,11 @@ from app.entities.sessao import SessaoAtual
 from app.schemas.auth_schema import (
     AlterarSenhaEntrada,
     CadastroEntrada,
+    ConfirmarEmailEntrada,
     LoginEntrada,
     MensagemResposta,
     RecuperarSenhaEntrada,
+    ReenviarConfirmacaoEntrada,
     RedefinirSenhaEntrada,
     UsuarioResposta,
 )
@@ -26,6 +28,14 @@ from app.services.email_service import EnviadorEmail, enviar_sem_interromper
 
 NOME_COOKIE = "mv_sessao"
 CAMINHO_COOKIE = "/api"
+
+MENSAGEM_CADASTRO = (
+    "Conta criada! Enviamos um link de confirmação para {email}. Abra o link para liberar a "
+    "entrada (confira também o spam)."
+)
+MENSAGEM_REENVIO = (
+    "Enviamos um novo link de confirmação para {email}. O link anterior não vale mais."
+)
 
 MENSAGEM_RECUPERACAO = (
     "Enviamos um link para criar uma senha nova. Confira a caixa de entrada e o spam."
@@ -62,11 +72,22 @@ class AuthController:
         resposta.delete_cookie(NOME_COOKIE, path=CAMINHO_COOKIE, httponly=True, samesite="lax",
                                secure=self._cookie.seguro)
 
-    def cadastrar(self, dados: CadastroEntrada, resposta: Response) -> UsuarioResposta:
-        resultado = self._service.cadastrar(dados.nome, dados.email, dados.senha,
-                                            dados.confirmacao_senha)
-        self._gravar_cookie(resposta, resultado.token_sessao)
-        return UsuarioResposta.model_validate(resultado.usuario)
+    def cadastrar(self, dados: CadastroEntrada, tarefas: BackgroundTasks) -> MensagemResposta:
+        mensagem = self._service.cadastrar(dados.nome, dados.email, dados.senha,
+                                           dados.confirmacao_senha)
+        # Enviado depois da resposta: a tela não espera o servidor de e-mail.
+        tarefas.add_task(enviar_sem_interromper, self._enviador, mensagem)
+        return MensagemResposta(mensagem=MENSAGEM_CADASTRO.format(email=mensagem.para))
+
+    def confirmar_email(self, dados: ConfirmarEmailEntrada) -> MensagemResposta:
+        self._service.confirmar_email(dados.token)
+        return MensagemResposta(mensagem="E-mail confirmado! Entre com seu e-mail e senha.")
+
+    def reenviar_confirmacao(self, dados: ReenviarConfirmacaoEntrada,
+                             tarefas: BackgroundTasks) -> MensagemResposta:
+        mensagem = self._service.reenviar_confirmacao(dados.email)
+        tarefas.add_task(enviar_sem_interromper, self._enviador, mensagem)
+        return MensagemResposta(mensagem=MENSAGEM_REENVIO.format(email=mensagem.para))
 
     def entrar(self, dados: LoginEntrada, requisicao: Request, resposta: Response) -> UsuarioResposta:
         resultado = self._service.entrar(dados.email, dados.senha, ip_de(requisicao))

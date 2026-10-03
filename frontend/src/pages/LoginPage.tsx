@@ -6,8 +6,10 @@ import BotaoEnviar from "../components/BotaoEnviar";
 import CabecalhoMarca from "../components/CabecalhoMarca";
 import CampoSenha from "../components/CampoSenha";
 import CampoTexto from "../components/CampoTexto";
+import ReenvioConfirmacao from "../components/ReenvioConfirmacao";
 import { useAuth } from "../contexts/AuthContext";
 import { useEnvioFormulario } from "../hooks/useEnvioFormulario";
+import { ErroDaApi } from "../services/apiCliente";
 import { erroEmail, erroObrigatorio, soErros } from "../utils/validacao";
 
 // Tela "Entrar" (PDF, página 1).
@@ -18,6 +20,8 @@ export default function LoginPage() {
   const destino = (local.state as { destino?: string } | null)?.destino ?? "/";
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+  // E-mail da conta que ainda não confirmou (mostra o botão de reenviar o link).
+  const [semConfirmar, setSemConfirmar] = useState<string | null>(null);
   const { enviando, erroGeral, errosCampo, setErrosCampo, enviar } = useEnvioFormulario();
 
   async function aoEnviar(evento: FormEvent) {
@@ -30,8 +34,16 @@ export default function LoginPage() {
       setErrosCampo(erros);
       return;
     }
+    setSemConfirmar(null);
     const deuCerto = await enviar(async () => {
-      await entrar(email, senha);
+      try {
+        await entrar(email, senha);
+      } catch (erro) {
+        if (erro instanceof ErroDaApi && erro.codigo === "email_nao_confirmado") {
+          setSemConfirmar(email);
+        }
+        throw erro;
+      }
     });
     if (deuCerto) navegar(destino, { replace: true });
   }
@@ -43,6 +55,7 @@ export default function LoginPage() {
         <h2 className="titulo-pagina">Entrar</h2>
         {erroInicial && <Alerta tipo="erro">{erroInicial}</Alerta>}
         {erroGeral && <Alerta tipo="erro">{erroGeral}</Alerta>}
+        {semConfirmar && <ReenvioConfirmacao email={semConfirmar} />}
         <form onSubmit={aoEnviar} noValidate>
           <CampoTexto
             rotulo="E-mail"

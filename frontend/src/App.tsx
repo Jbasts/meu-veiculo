@@ -10,6 +10,7 @@ import AdminConvitePage from "./pages/AdminConvitePage";
 import AdminPage from "./pages/AdminPage";
 import AdminUsuarioPage from "./pages/AdminUsuarioPage";
 import CadastroPage from "./pages/CadastroPage";
+import ConfirmarEmailPage from "./pages/ConfirmarEmailPage";
 import ContaPage from "./pages/ContaPage";
 import DiagnosticoDetalhePage from "./pages/DiagnosticoDetalhePage";
 import DiagnosticoFormPage from "./pages/DiagnosticoFormPage";
@@ -104,6 +105,7 @@ export function RotasDoApp() {
       <Route path="/criar-conta" element={<RotaSoParaVisitante><CadastroPage /></RotaSoParaVisitante>} />
       <Route path="/esqueci-senha" element={<EsqueciSenhaPage />} />
       <Route path="/redefinir-senha" element={<RedefinirSenhaPage />} />
+      <Route path="/confirmar-email" element={<ConfirmarEmailPage />} />
       <Route path="/situacao" element={<SituacaoSistemaPage />} />
       <Route path="*" element={<NaoEncontradaPage />} />
     </Routes>

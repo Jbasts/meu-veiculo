@@ -54,7 +54,8 @@ def cliente(banco_migrado):
     app = montar_app()
     app.dependency_overrides[obter_engine] = lambda: banco_migrado
     app.dependency_overrides[obter_senha_service] = lambda: SENHAS_RAPIDAS
-    app.dependency_overrides[obter_enviador_email] = lambda: CaixaDeEntrada()
+    caixa = CaixaDeEntrada()
+    app.dependency_overrides[obter_enviador_email] = lambda: caixa
     return lambda: TestClient(app, headers=CABECALHOS_APP)
 
 

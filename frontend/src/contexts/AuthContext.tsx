@@ -17,7 +17,6 @@ interface EstadoAuth {
   /** Mensagem quando não foi possível conferir a sessão (servidor fora do ar). */
   erroInicial: string | null;
   entrar: (email: string, senha: string) => Promise<Usuario>;
-  cadastrar: (dados: Parameters<typeof authService.cadastrar>[0]) => Promise<Usuario>;
   sair: () => Promise<void>;
   /** Esquece o usuário localmente (ex.: a API respondeu 401 no meio do uso). */
   esquecerUsuario: () => void;
@@ -54,12 +53,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return novo;
   }, []);
 
-  const cadastrar = useCallback(async (dados: Parameters<typeof authService.cadastrar>[0]) => {
-    const novo = await authService.cadastrar(dados);
-    setUsuario(novo);
-    return novo;
-  }, []);
-
   const sair = useCallback(async () => {
     try {
       await authService.sair();
@@ -78,8 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [esquecerUsuario]);
 
   const valor = useMemo<EstadoAuth>(
-    () => ({ carregando, usuario, erroInicial, entrar, cadastrar, sair, esquecerUsuario, recarregar }),
-    [carregando, usuario, erroInicial, entrar, cadastrar, sair, esquecerUsuario, recarregar],
+    () => ({ carregando, usuario, erroInicial, entrar, sair, esquecerUsuario, recarregar }),
+    [carregando, usuario, erroInicial, entrar, sair, esquecerUsuario, recarregar],
   );
 
   return <ContextoAuth.Provider value={valor}>{children}</ContextoAuth.Provider>;

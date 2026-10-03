@@ -41,6 +41,14 @@ class RedefinirSenhaEntrada(_Entrada):
     confirmacao_senha: str = Field(max_length=1000)
 
 
+class ConfirmarEmailEntrada(_Entrada):
+    token: str = Field(max_length=300)
+
+
+class ReenviarConfirmacaoEntrada(_Entrada):
+    email: str = Field(max_length=320)
+
+
 class UsuarioResposta(BaseModel):
     """Dados da conta que podem ir para a tela. Nunca inclui senha_hash."""
 

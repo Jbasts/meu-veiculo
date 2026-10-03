@@ -99,13 +99,26 @@ describe("Criar conta", () => {
     await userEvent.click(screen.getByRole("button", { name: "Criar conta" }));
   }
 
-  it("cria a conta e entra", async () => {
-    const buscar = apiFalsa({ ...NAO_LOGADO, "POST /api/auth/cadastro": () => json(201, PAULA) });
+  it("cria a conta sem entrar e pede para confirmar o e-mail", async () => {
+    const criada = "Conta criada! Enviamos um link de confirmação para paula@email.com.";
+    const reenviada = "Enviamos um novo link de confirmação para paula@email.com.";
+    const buscar = apiFalsa({
+      ...NAO_LOGADO,
+      "POST /api/auth/cadastro": () => json(201, { mensagem: criada }),
+      "POST /api/auth/reenviar-confirmacao": () => json(202, { mensagem: reenviada }),
+    });
     renderizarApp("/criar-conta");
     await preencher();
-    expect(await screen.findByRole("heading", { name: "Olá, Paula" })).toBeInTheDocument();
+    expect(await screen.findByText(criada)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Olá, Paula" })).not.toBeInTheDocument();
     const [[, opcoes]] = chamadasPara(buscar, "POST /api/auth/cadastro");
     expect(JSON.parse(opcoes.body as string)).not.toHaveProperty("perfil");
+
+    await userEvent.click(screen.getByRole("button", { name: "Reenviar link de confirmação" }));
+    expect(await screen.findByText(reenviada)).toBeInTheDocument();
+    const [[, reenvio]] = chamadasPara(buscar, "POST /api/auth/reenviar-confirmacao");
+    expect(JSON.parse(reenvio.body as string)).toEqual({ email: "paula@email.com" });
+    expect(screen.getByRole("link", { name: "Ir para Entrar" })).toHaveAttribute("href", "/entrar");
   });
 
   it("avisa quando a confirmação é diferente", async () => {
@@ -127,6 +140,73 @@ describe("Criar conta", () => {
     const campoEmail = await screen.findByLabelText("E-mail");
     await waitFor(() => expect(campoEmail).toHaveAttribute("aria-invalid", "true"));
     expect(screen.getAllByText(mensagem)).toHaveLength(2); // aviso geral + campo
+  });
+});
+
+describe("Confirmar e-mail", () => {
+  it("entrar sem confirmar mostra o botão de reenviar o link", async () => {
+    const mensagem = "Confirme seu e-mail para entrar: abra o link que enviamos.";
+    const buscar = apiFalsa({
+      ...NAO_LOGADO,
+      "POST /api/auth/entrar": () =>
+        json(403, { mensagem, campos: { email: mensagem }, codigo: "email_nao_confirmado" }),
+      "POST /api/auth/reenviar-confirmacao": () => json(202, { mensagem: "Enviamos um novo link." }),
+    });
+    renderizarApp("/entrar");
+    await userEvent.type(await screen.findByLabelText("E-mail"), "paula@email.com");
+    await userEvent.type(screen.getByLabelText("Senha"), "meu carro azul 2020");
+    await userEvent.click(screen.getByRole("button", { name: "Entrar" }));
+    expect((await screen.findAllByText(mensagem)).length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole("button", { name: "Reenviar link de confirmação" }));
+    expect(await screen.findByText("Enviamos um novo link.")).toBeInTheDocument();
+    expect(chamadasPara(buscar, "POST /api/auth/reenviar-confirmacao")).toHaveLength(1);
+  });
+
+  it("outro erro de login não mostra o botão de reenviar", async () => {
+    apiFalsa({
+      ...NAO_LOGADO,
+      "POST /api/auth/entrar": () => json(401, { mensagem: "E-mail ou senha incorretos." }),
+    });
+    renderizarApp("/entrar");
+    await userEvent.type(await screen.findByLabelText("E-mail"), "paula@email.com");
+    await userEvent.type(screen.getByLabelText("Senha"), "errada errada");
+    await userEvent.click(screen.getByRole("button", { name: "Entrar" }));
+    expect(await screen.findByText("E-mail ou senha incorretos.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reenviar link de confirmação" })).not.toBeInTheDocument();
+  });
+
+  it("abre o link, confirma uma vez só e tira o token do endereço", async () => {
+    window.history.replaceState(null, "", "/confirmar-email#token=abc123");
+    const buscar = apiFalsa({
+      ...NAO_LOGADO,
+      "POST /api/auth/confirmar-email": () =>
+        json(200, { mensagem: "E-mail confirmado! Entre com seu e-mail e senha." }),
+    });
+    renderizarApp("/confirmar-email");
+    expect(await screen.findByText("E-mail confirmado! Entre com seu e-mail e senha.")).toBeInTheDocument();
+    const chamadas = chamadasPara(buscar, "POST /api/auth/confirmar-email");
+    expect(chamadas).toHaveLength(1);
+    expect(JSON.parse(chamadas[0][1].body as string)).toEqual({ token: "abc123" });
+    expect(window.location.hash).toBe("");
+    expect(screen.getByRole("link", { name: "Entrar" })).toHaveAttribute("href", "/entrar");
+  });
+
+  it("link que não vale mais mostra o motivo", async () => {
+    window.history.replaceState(null, "", "/confirmar-email#token=velho");
+    const mensagem = "Este link de confirmação não vale mais.";
+    apiFalsa({
+      ...NAO_LOGADO,
+      "POST /api/auth/confirmar-email": () => json(422, { mensagem, campos: { token: mensagem } }),
+    });
+    renderizarApp("/confirmar-email");
+    expect(await screen.findByText(mensagem)).toBeInTheDocument();
+  });
+
+  it("sem token, avisa que o link está incompleto", async () => {
+    window.history.replaceState(null, "", "/confirmar-email");
+    apiFalsa(NAO_LOGADO);
+    renderizarApp("/confirmar-email");
+    expect(await screen.findByText(/link está incompleto/)).toBeInTheDocument();
   });
 });
 

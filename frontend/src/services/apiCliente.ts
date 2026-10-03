@@ -18,12 +18,16 @@ export type RespostaApi =
 export class ErroDaApi extends Error {
   readonly status: number;
   readonly campos: Record<string, string>;
+  /** Caso que a tela trata de um jeito próprio (ex.: "email_nao_confirmado"). */
+  readonly codigo?: string;
 
-  constructor(status: number, mensagem: string, campos: Record<string, string> = {}) {
+  constructor(status: number, mensagem: string, campos: Record<string, string> = {},
+    codigo?: string) {
     super(mensagem);
     this.name = "ErroDaApi";
     this.status = status;
     this.campos = campos;
+    this.codigo = codigo;
   }
 }
 
@@ -58,11 +62,16 @@ export async function requisitarApi(caminho: string, opcoes: RequestInit = {}): 
   return { tipo: "resposta", status: resposta.status, corpo };
 }
 
-function mensagemDoCorpo(corpo: unknown): { mensagem?: string; campos?: Record<string, string> } {
+function mensagemDoCorpo(corpo: unknown): {
+  mensagem?: string;
+  campos?: Record<string, string>;
+  codigo?: string;
+} {
   if (typeof corpo !== "object" || corpo === null) return {};
-  const { mensagem, campos } = corpo as { mensagem?: unknown; campos?: unknown };
+  const { mensagem, campos, codigo } = corpo as { mensagem?: unknown; campos?: unknown; codigo?: unknown };
   return {
     mensagem: typeof mensagem === "string" ? mensagem : undefined,
+    codigo: typeof codigo === "string" ? codigo : undefined,
     campos:
       typeof campos === "object" && campos !== null ? (campos as Record<string, string>) : undefined,
   };
@@ -101,10 +110,11 @@ export async function chamarApi<T>(metodo: string, caminho: string, dados?: unkn
   if (resposta.status === 401 && !caminho.startsWith("/auth/")) {
     aoPerderSessao?.();
   }
-  const { mensagem, campos } = mensagemDoCorpo(resposta.corpo);
+  const { mensagem, campos, codigo } = mensagemDoCorpo(resposta.corpo);
   throw new ErroDaApi(
     resposta.status,
     mensagem ?? `O servidor não conseguiu atender o pedido (código ${resposta.status}).`,
     campos ?? {},
+    codigo,
   );
 }

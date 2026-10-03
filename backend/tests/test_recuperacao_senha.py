@@ -42,9 +42,10 @@ def banco(banco_migrado, caixa):
 
 
 @pytest.fixture
-def conta(banco):
+def conta(banco, caixa):
     aparelho = novo_aparelho()
     cadastrar(aparelho)
+    caixa.mensagens.clear()  # o e-mail de confirmação do cadastro não interessa aqui
     return aparelho
 
 
@@ -57,7 +58,7 @@ def test_pedido_para_email_cadastrado_envia_link(banco, conta, caixa):
     assert "http://localhost:5173/redefinir-senha#token=" in mensagem.texto
     assert "60 minutos" in mensagem.texto
     # O banco guarda só o hash do token do link.
-    assert caixa.ultimo_token() not in valor_sql(banco, "SELECT token_hash FROM recuperacao_senha")
+    assert caixa.ultimo_token() not in valor_sql(banco, "SELECT token_hash FROM recuperacao_senha WHERE finalidade = 'recuperacao'")
 
 
 def test_email_sem_conta_pede_para_digitar_de_novo(banco, conta, caixa):
@@ -71,7 +72,7 @@ def test_email_sem_conta_pede_para_digitar_de_novo(banco, conta, caixa):
     assert nao_existe.json()["mensagem"] == "E-mail não existente, digite novamente."
     assert nao_existe.json()["campos"] == {"email": "E-mail não existente, digite novamente."}
     assert len(caixa.mensagens) == 1  # só a conta real recebeu
-    assert valor_sql(banco, "SELECT count(*) FROM recuperacao_senha") == 1
+    assert valor_sql(banco, "SELECT count(*) FROM recuperacao_senha WHERE finalidade = 'recuperacao'") == 1
 
 
 
@@ -195,7 +196,7 @@ def test_link_consumido_ao_mesmo_tempo_so_funciona_uma_vez(banco, conta, caixa):
         tarefa.join(timeout=30)
 
     assert sorted(resultados) == ["ok", "recusado"]
-    assert valor_sql(banco, "SELECT count(*) FROM recuperacao_senha WHERE usado_em IS NOT NULL") == 1
+    assert valor_sql(banco, "SELECT count(*) FROM recuperacao_senha WHERE usado_em IS NOT NULL AND finalidade = 'recuperacao'") == 1
 
 
 def test_falha_na_troca_desfaz_o_consumo_do_link(banco, conta, caixa, monkeypatch):
@@ -212,6 +213,6 @@ def test_falha_na_troca_desfaz_o_consumo_do_link(banco, conta, caixa, monkeypatc
     sessao.close()
     monkeypatch.undo()
 
-    assert valor_sql(banco, "SELECT count(*) FROM recuperacao_senha WHERE usado_em IS NOT NULL") == 0
+    assert valor_sql(banco, "SELECT count(*) FROM recuperacao_senha WHERE usado_em IS NOT NULL AND finalidade = 'recuperacao'") == 0
     assert conta.get("/api/auth/eu").status_code == 200  # sessões intactas
     assert redefinir(novo_aparelho(), token).status_code == 200

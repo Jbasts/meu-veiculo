@@ -10,8 +10,17 @@ export function cadastrar(dados: {
   email: string;
   senha: string;
   confirmacao_senha: string;
-}): Promise<Usuario> {
-  return chamarApi<Usuario>("POST", "/auth/cadastro", dados);
+}): Promise<Mensagem> {
+  // Não entra: a conta só entra depois de confirmar o e-mail pelo link.
+  return chamarApi<Mensagem>("POST", "/auth/cadastro", dados);
+}
+
+export function confirmarEmail(token: string): Promise<Mensagem> {
+  return chamarApi<Mensagem>("POST", "/auth/confirmar-email", { token });
+}
+
+export function reenviarConfirmacao(email: string): Promise<Mensagem> {
+  return chamarApi<Mensagem>("POST", "/auth/reenviar-confirmacao", { email });
 }
 
 export function entrar(email: string, senha: string): Promise<Usuario> {

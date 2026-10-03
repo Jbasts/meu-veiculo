@@ -8,10 +8,12 @@ from tests.auth_utils import (
     SENHA_NOVA,
     CaixaDeEntrada,
     cadastrar,
+    confirmar,
     entrar,
     executar_sql,
     ligar_app_ao_banco,
     novo_aparelho,
+    so_cadastrar,
     valor_sql,
 )
 
@@ -30,9 +32,12 @@ def aparelho(banco):
 
 # ------------------------------------------------------------------ cadastro
 
-def test_cadastro_cria_conta_padrao_e_ja_entra(banco, aparelho):
-    resposta = cadastrar(aparelho, email="  Paula@Email.COM ")
-    assert resposta.status_code == 201
+def test_conta_confirmada_entra_com_cookie_protegido(banco, aparelho):
+    """O cadastro em si (sem entrar, com e-mail de confirmação) está em
+    test_confirmacao_email.py; aqui a conta já foi confirmada."""
+    assert cadastrar(aparelho, email="  Paula@Email.COM ").status_code == 201
+    resposta = entrar(novo_aparelho(), email="paula@email.com")
+    assert resposta.status_code == 200
     corpo = resposta.json()
     assert corpo == {"id": corpo["id"], "nome": "Paula", "email": "paula@email.com",
                      "perfil": "padrao", "ativo": True}
@@ -248,17 +253,20 @@ def test_cookie_seguro_com_https(banco):
     app.dependency_overrides[obter_enviador_email] = lambda: caixa
     celular = TestClient(app, headers=CABECALHOS_APP, base_url="https://testserver")
 
-    resposta = cadastrar(celular)
-    assert resposta.status_code == 201
+    assert so_cadastrar(celular).status_code == 201
+    assert confirmar(celular, caixa.ultimo_token()).status_code == 200
+    resposta = entrar(celular)
+    assert resposta.status_code == 200
     cookie = resposta.headers["set-cookie"].lower()
     assert "secure" in cookie and "httponly" in cookie and "samesite=lax" in cookie
     assert celular.get("/api/auth/eu").status_code == 200
     assert "secure" in celular.post("/api/auth/sair").headers["set-cookie"].lower()
 
+    assert "https://192.168.0.10:4173/confirmar-email#token=" in caixa.mensagens[0].texto
     assert pedir_recuperacao(celular).status_code in (200, 202)
     assert "https://192.168.0.10:4173/redefinir-senha#token=" in caixa.mensagens[-1].texto
 
 
 def test_sem_cookie_seguro_o_padrao_continua_em_http(banco, aparelho):
-    resposta = cadastrar(aparelho)
-    assert "secure" not in resposta.headers["set-cookie"].lower()
+    cadastrar(aparelho)
+    assert "secure" not in entrar(novo_aparelho()).headers["set-cookie"].lower()

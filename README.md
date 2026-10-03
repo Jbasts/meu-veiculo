@@ -354,7 +354,8 @@ npm run dev
 ```
 
 Esperado: `Local: http://localhost:5173/`. Abra esse endereço no navegador: a
-tela "Entrar" aparece. Crie uma conta em "Criar conta" e você vai para o
+tela "Entrar" aparece. Crie uma conta em "Criar conta", abra o link de
+confirmação que chega por e-mail (seção 9.1) e entre: você vai para o
 Início. A tela http://localhost:5173/situacao mostra API "No ar", Banco
 "Conectado", Migrations "Em dia" com a versão mais recente, o fuso e a data.
 
@@ -426,7 +427,7 @@ não impede nada.
 
 | Item | Regra |
 |---|---|
-| Cadastro | nome, e-mail, senha e confirmação. A conta nasce com perfil **padrão**. Um campo a mais (como `"perfil": "admin"`) faz o pedido ser recusado. |
+| Cadastro | nome, e-mail, senha e confirmação. A conta nasce com perfil **padrão** e **só entra depois de confirmar o e-mail** (veja abaixo). Um campo a mais (como `"perfil": "admin"`) faz o pedido ser recusado. |
 | E-mail | guardado sem espaços nas pontas e em minúsculas: ` Paula@Email.com ` e `paula@email.com` são o mesmo. O banco recusa outra grafia (restrição da migration 0002). |
 | Senha | de 8 a 128 caracteres, qualquer caractere; não pode ser só espaços, igual ao e-mail ou uma das senhas mais usadas ("12345678", "senha123"...). Não exigimos maiúscula e símbolo: isso leva a senhas previsíveis como "Senha@123". Frases longas são mais fortes. |
 | Hash | **Argon2id** (RFC 9106, recomendado pela OWASP): 3 passadas, 64 MiB de memória, 4 linhas; sal aleatório por senha. A senha nunca é gravada nem devolvida. |
@@ -436,6 +437,16 @@ não impede nada.
 | Conta desativada | perde o acesso na próxima ação, mesmo com uma sessão aberta antes. |
 | Limite de tentativas | login: 5 erros por e-mail ou 20 por endereço de rede em 15 minutos. Recuperação: **sem limite** (decisão sua): pode tentar quantas vezes quiser; e-mail errado só mostra o aviso. |
 | Requisições forjadas | toda gravação exige o cabeçalho `X-MV-Requisicao: 1`, que só o app envia. Outro site não consegue acrescentar esse cabeçalho. |
+
+**Confirmação do e-mail ao criar a conta** (migration 0014, pedido seu de 02/10/2026):
+
+1. Em **Criar conta**, a pessoa preenche os dados. A conta é criada, mas **ainda não entra**: a tela mostra "Conta criada! Enviamos um link de confirmação para ..." e o botão **Reenviar link de confirmação**.
+2. Chega o e-mail "Meu Veículo: confirme seu e-mail" com o link `.../confirmar-email#token=...`. Ele vale **48 horas** (`CONFIRMACAO_HORAS` no `.env`) e só pode ser usado uma vez; pedir outro invalida o anterior. O banco guarda só o hash do token.
+3. Ao abrir o link, a tela confirma sozinha e mostra "E-mail confirmado! Entre com seu e-mail e senha." com o botão **Entrar**. A conta passa a entrar normalmente.
+4. Se tentar entrar antes de confirmar (com a senha certa), a tela Entrar avisa "Confirme seu e-mail para entrar..." e mostra o botão **Reenviar link de confirmação**. Com a senha errada, a resposta é a de sempre.
+5. Abrir um link de senha que chegou por e-mail ("Esqueci minha senha" ou o convite do administrador) também confirma o e-mail: a pessoa provou que o e-mail é dela.
+6. **Contas que já existiam antes da 0014 continuam entrando** (ficam como confirmadas, sem data de confirmação). Para ativar a regra no seu banco: pasta `backend`, `.\.venv\Scripts\python.exe gerenciar.py migrar` (faz backup antes).
+7. No modo `EMAIL_MODO=arquivo`, o e-mail de confirmação vira um `.eml` em `backend\emails_dev\` (seção 10.1); com o Gmail (seção 10.2), chega na caixa de entrada.
 
 ### 9.2 Recuperação de senha
 
@@ -463,7 +474,7 @@ não impede nada.
 Não existe senha fixa nem endereço da API para virar admin. O primeiro admin é
 criado assim:
 
-1. Crie a conta normalmente pela tela "Criar conta".
+1. Crie a conta normalmente pela tela "Criar conta" e confirme o e-mail pelo link (seção 9.1).
 2. Na pasta `meu-veiculo\backend`, rode:
 
    ```powershell
@@ -492,7 +503,9 @@ cada uma. Depois rode de novo `gerenciar.py migrar`.
 ### 10.1 Desenvolvimento: modo "arquivo" (padrão, gratuito)
 
 Com `EMAIL_MODO=arquivo` (padrão), nenhum e-mail sai do computador: cada
-mensagem vira um arquivo `.eml` em `backend\emails_dev\`.
+mensagem (confirmação do cadastro, recuperação de senha, convite) vira um
+arquivo `.eml` em `backend\emails_dev\`. Para confirmar uma conta nova, abra
+o `.eml` mais recente e copie o link `.../confirmar-email#token=...`.
 
 Para testar:
 
@@ -1741,6 +1754,12 @@ existe uma carga **opcional** de dados de exemplo. Ela grava só num banco
 próprio, `meu_veiculo_demo` (`DB_NOME_DEMO`), e nunca no de desenvolvimento
 (há uma trava: o nome precisa terminar em `_demo`). As migrations não criam
 dados de exemplo, e o sistema continua funcionando com banco vazio.
+
+Roteiro da demonstração (passo a passo, falas, plano B e perguntas
+prováveis da banca): `docspresentacao
+oteiro.md`. Resumo técnico para o
+texto do TCC: `docspresentacao
+esumo-para-o-tcc.md`.
 
 ### 20.1 O que é criado
 

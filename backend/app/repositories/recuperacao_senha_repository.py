@@ -31,17 +31,19 @@ class RecuperacaoSenhaRepository:
             .execution_options(synchronize_session=False)
         )
 
-    def consumir(self, token_hash: str) -> int | None:
+    def consumir(self, token_hash: str, finalidades: tuple[str, ...]) -> int | None:
         """Marca o link como usado e devolve o id do usuário, numa única instrução.
 
         Se duas requisições chegarem juntas com o mesmo link, o PostgreSQL
         faz a segunda esperar a primeira; quando a primeira grava usado_em,
         a condição "usado_em IS NULL" deixa de valer e a segunda não recebe
-        nada. Ou seja: o link funciona uma única vez.
+        nada. Ou seja: o link funciona uma única vez. "finalidades": um link
+        de confirmação de e-mail não troca senha, e vice-versa.
         """
         return self._sessao.execute(
             update(RecuperacaoSenha)
             .where(RecuperacaoSenha.token_hash == token_hash,
+                   RecuperacaoSenha.finalidade.in_(finalidades),
                    RecuperacaoSenha.usado_em.is_(None),
                    RecuperacaoSenha.cancelado_em.is_(None),
                    RecuperacaoSenha.expira_em > func.now())

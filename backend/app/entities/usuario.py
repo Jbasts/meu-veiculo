@@ -24,6 +24,9 @@ class Usuario(Base):
     senha_hash: Mapped[str] = mapped_column(String(255))
     perfil: Mapped[str] = mapped_column(String(10), server_default=text("'padrao'"))
     ativo: Mapped[bool] = mapped_column(server_default=text("true"))
+    # Migration 0014: conta criada pela tela só entra depois de confirmar o e-mail.
+    email_confirmado: Mapped[bool] = mapped_column(server_default=text("false"))
+    email_confirmado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ultimo_acesso: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     # Veículo selecionado nas telas. O banco garante que é um veículo do próprio usuário.

@@ -9,9 +9,11 @@ from app.dependencias import SessaoAtualDep, obter_auth_controller
 from app.schemas.auth_schema import (
     AlterarSenhaEntrada,
     CadastroEntrada,
+    ConfirmarEmailEntrada,
     LoginEntrada,
     MensagemResposta,
     RecuperarSenhaEntrada,
+    ReenviarConfirmacaoEntrada,
     RedefinirSenhaEntrada,
     UsuarioResposta,
 )
@@ -23,10 +25,24 @@ ControllerDep = Annotated[AuthController, Depends(obter_auth_controller)]
 ERROS = {code: {"model": ErroResposta} for code in (401, 403, 409, 422, 429)}
 
 
-@router.post("/cadastro", response_model=UsuarioResposta, status_code=201, responses=ERROS,
-             summary="Criar conta (perfil padrão) e já entrar")
-def cadastrar(dados: CadastroEntrada, resposta: Response, controller: ControllerDep):
-    return controller.cadastrar(dados, resposta)
+@router.post("/cadastro", response_model=MensagemResposta, status_code=201, responses=ERROS,
+             summary="Criar conta (perfil padrão); envia o link de confirmação do e-mail")
+def cadastrar(dados: CadastroEntrada, tarefas: BackgroundTasks, controller: ControllerDep):
+    return controller.cadastrar(dados, tarefas)
+
+
+@router.post("/confirmar-email", response_model=MensagemResposta, responses=ERROS,
+             summary="Confirmar o e-mail pelo link (libera a entrada)")
+def confirmar_email(dados: ConfirmarEmailEntrada, controller: ControllerDep):
+    return controller.confirmar_email(dados)
+
+
+@router.post("/reenviar-confirmacao", response_model=MensagemResposta, status_code=202,
+             responses={**ERROS, 404: {"model": ErroResposta}},
+             summary="Enviar outro link de confirmação do e-mail")
+def reenviar_confirmacao(dados: ReenviarConfirmacaoEntrada, tarefas: BackgroundTasks,
+                         controller: ControllerDep):
+    return controller.reenviar_confirmacao(dados, tarefas)
 
 
 @router.post("/entrar", response_model=UsuarioResposta, responses=ERROS, summary="Entrar")

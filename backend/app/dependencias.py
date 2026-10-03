@@ -118,6 +118,7 @@ def obter_autenticacao_service(
         validade_link=timedelta(minutes=cfg.recuperacao_minutos),
         url_frontend=cfg.url_frontend,
         validade_convite=timedelta(days=cfg.convite_dias),
+        validade_confirmacao=timedelta(hours=cfg.confirmacao_horas),
     )
 
 

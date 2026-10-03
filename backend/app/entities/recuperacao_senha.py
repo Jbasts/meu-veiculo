@@ -1,7 +1,8 @@
 """Tabela recuperacao_senha (migration 0002): links de uso único para definir senha.
 
 finalidade "recuperacao" = "Esqueci minha senha";
-finalidade "convite" = conta criada pelo administrador (etapa 9).
+finalidade "convite" = conta criada pelo administrador (etapa 9);
+finalidade "confirmacao" = confirmar o e-mail de uma conta nova (migration 0014).
 """
 
 from datetime import datetime

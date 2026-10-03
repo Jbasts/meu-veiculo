@@ -1,6 +1,6 @@
 """Acesso à tabela usuario."""
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session
 
@@ -41,6 +41,13 @@ class UsuarioRepository:
                 raise EmailJaCadastrado() from None
             raise
         return usuario
+
+    def confirmar_email(self, usuario: Usuario) -> None:
+        """Marca o e-mail como confirmado (uma vez só: não muda a data depois)."""
+        if not usuario.email_confirmado:
+            usuario.email_confirmado = True
+            usuario.email_confirmado_em = func.now()
+            self._sessao.flush()
 
     def atualizar_senha(self, usuario: Usuario, senha_hash: str) -> None:
         usuario.senha_hash = senha_hash

@@ -33,10 +33,11 @@ from PIL import Image, ImageDraw, ImageFont
 from sqlalchemy import Engine
 
 from app.banco.sessao import UnidadeDeTrabalho, abrir_sessao
-from app.dependencias import obter_engine
+from app.dependencias import obter_engine, obter_enviador_email
 from app.main import app
 from app.repositories.usuario_repository import UsuarioRepository
 from app.services import calendario
+from app.services.email_service import MensagemEmail
 from app.services.usuario_service import UsuarioService
 
 SENHA_EXEMPLO = "meu veiculo de exemplo"
@@ -46,6 +47,16 @@ EMAIL_PADRAO = "rafael@exemplo.com.br"
 KM_POR_DIA = 32          # o Civic de exemplo roda cerca de 1.000 km por mês
 KM_HOJE = 85_000
 DIAS_DE_HISTORICO = 240
+
+
+class _CaixaEmMemoria:
+    """Enviador de e-mail da carga: guarda a mensagem numa lista."""
+
+    def __init__(self, destino: list[MensagemEmail]):
+        self._destino = destino
+
+    def enviar(self, mensagem: MensagemEmail) -> None:
+        self._destino.append(mensagem)
 
 
 class FalhaNaCarga(Exception):
@@ -120,6 +131,8 @@ def _imagem(titulo: str, cor: tuple[int, int, int]) -> bytes:
 
 class _Carga:
     def __init__(self, hoje: date):
+        # E-mails do cadastro ficam só aqui (nunca saem pelo SMTP do .env).
+        self.caixa: list[MensagemEmail] = []
         self.hoje = hoje
         self.resumo = Resumo()
 
@@ -130,11 +143,13 @@ class _Carga:
     def km(self, dias_atras: int) -> int:
         return KM_HOJE - KM_POR_DIA * dias_atras
 
-    def enviar(self, cliente: TestClient, metodo: str, caminho: str, dados=None, **extra) -> dict:
+    def enviar(self, cliente: TestClient, metodo: str, caminho: str, dados=None, *,
+               contar: bool = True, **extra) -> dict:
         resposta = cliente.request(metodo, f"/api{caminho}", json=dados, **extra)
         if resposta.status_code >= 400:
             raise FalhaNaCarga(f"{metodo} {caminho} → {resposta.status_code}: {resposta.text}")
-        self.resumo.registros += 1
+        if contar:  # cadastro, confirmação e entrada não são registros do veículo
+            self.resumo.registros += 1
         return resposta.json() if resposta.content else {}
 
     def foto(self, cliente: TestClient, veiculo_id: int, titulo: str, cor, dias_atras: int,
@@ -151,14 +166,18 @@ class _Carga:
         self.resumo.fotos += 1
         return resposta.json()
 
-    @staticmethod
-    def conta(nome: str, email: str) -> TestClient:
+    def conta(self, nome: str, email: str) -> TestClient:
+        """Cadastra, confirma o e-mail pelo link (capturado em memória, nada é
+        enviado) e entra, como a pessoa faria pelas telas."""
         cliente = TestClient(app, headers={"X-MV-Requisicao": "1"})
-        resposta = cliente.post("/api/auth/cadastro", json={
+        self.enviar(cliente, "POST", "/auth/cadastro", {
             "nome": nome, "email": email, "senha": SENHA_EXEMPLO,
-            "confirmacao_senha": SENHA_EXEMPLO})
-        if resposta.status_code != 201:
-            raise FalhaNaCarga(f"cadastro de {email} → {resposta.status_code}: {resposta.text}")
+            "confirmacao_senha": SENHA_EXEMPLO}, contar=False)
+        link = next(m.texto for m in reversed(self.caixa) if m.para == email)
+        token = link.split("#token=")[1].split()[0]
+        self.enviar(cliente, "POST", "/auth/confirmar-email", {"token": token}, contar=False)
+        self.enviar(cliente, "POST", "/auth/entrar", {"email": email, "senha": SENHA_EXEMPLO},
+                    contar=False)
         return cliente
 
     # ------------------------------------------------------------ o Civic
@@ -402,6 +421,7 @@ def carregar(engine: Engine, hoje: date | None = None) -> Resumo:
     """Grava os dados de exemplo no banco da engine (que precisa estar migrado e sem contas)."""
     carga = _Carga(hoje or calendario.hoje())
     app.dependency_overrides[obter_engine] = lambda: engine
+    app.dependency_overrides[obter_enviador_email] = lambda: _CaixaEmMemoria(carga.caixa)
     try:
         paula = carga.conta("Paula Demonstração", EMAIL_ADMIN)
         rafael = carga.conta("Rafael Demonstração", EMAIL_PADRAO)
@@ -414,6 +434,7 @@ def carregar(engine: Engine, hoje: date | None = None) -> Resumo:
         carga.argo(rafael)
     finally:
         app.dependency_overrides.pop(obter_engine, None)
+        app.dependency_overrides.pop(obter_enviador_email, None)
     with abrir_sessao(engine) as sessao:
         UsuarioService(UnidadeDeTrabalho(sessao), UsuarioRepository(sessao)).promover_a_admin(EMAIL_ADMIN)
     return carga.resumo

@@ -510,3 +510,10 @@ form {
   opacity: 0.6;
   cursor: progress;
 }
+
+/* Botão "Reenviar link de confirmação" (Criar conta e Entrar). */
+.reenvio-confirmacao {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 18px;
+}

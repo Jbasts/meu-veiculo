@@ -10,7 +10,10 @@ Links de uso único (tabela recuperacao_senha), consumidos em redefinir_senha:
 - recuperação: "Esqueci minha senha" ou enviado pelo administrador; vale
   RECUPERACAO_MINUTOS (padrão 60);
 - convite: conta criada pelo administrador, sem senha conhecida; a pessoa
-  define a senha pelo link, que vale CONVITE_DIAS (padrão 7).
+  define a senha pelo link, que vale CONVITE_DIAS (padrão 7);
+- confirmacao: confirmar o e-mail da conta criada pela tela (migration 0014);
+  vale CONFIRMACAO_HORAS (padrão 48). Só depois a conta entra. Abrir um link
+  de senha (recuperação ou convite) também confirma o e-mail: ele chegou lá.
 
 Limites de tentativas (contados no banco, valem mesmo reiniciando a API):
 - login: 5 erros por e-mail ou 20 erros por endereço de rede em 15 minutos;
@@ -43,6 +46,10 @@ LIMITE_LOGIN_POR_IP = 20
 JANELA_LOGIN = timedelta(minutes=15)
 
 MENSAGEM_EMAIL_INEXISTENTE = "E-mail não existente, digite novamente."
+MENSAGEM_LINK_CONFIRMACAO_INVALIDO = (
+    "Este link de confirmação não vale mais (já foi usado, venceu ou foi trocado por um mais "
+    "novo). Se ainda não consegue entrar, peça outro link na tela Entrar."
+)
 
 MENSAGEM_LOGIN_INVALIDO = "E-mail ou senha incorretos."
 MENSAGEM_LINK_INVALIDO = (
@@ -68,7 +75,8 @@ class AutenticacaoService:
     def __init__(self, uow: Transacional, usuarios, sessoes, recuperacoes, tentativas,
                  senhas: SenhaService, *, validade_sessao: timedelta,
                  validade_link: timedelta, url_frontend: str,
-                 validade_convite: timedelta = timedelta(days=7)):
+                 validade_convite: timedelta = timedelta(days=7),
+                 validade_confirmacao: timedelta = timedelta(hours=48)):
         self._uow = uow
         self._usuarios = usuarios
         self._sessoes = sessoes
@@ -78,11 +86,13 @@ class AutenticacaoService:
         self._validade_sessao = validade_sessao
         self._validade_link = validade_link
         self._validade_convite = validade_convite
+        self._validade_confirmacao = validade_confirmacao
         self._url_frontend = url_frontend.rstrip("/")
 
     # ------------------------------------------------------------------ cadastro
-    def cadastrar(self, nome: str, email: str, senha: str, confirmacao: str) -> ResultadoEntrada:
-        """Cria a conta com perfil padrão (nunca admin) e já abre a sessão."""
+    def cadastrar(self, nome: str, email: str, senha: str, confirmacao: str) -> MensagemEmail:
+        """Cria a conta com perfil padrão (nunca admin), ainda sem entrar, e
+        devolve o e-mail com o link de confirmação (pedido da Paula, 0014)."""
         nome = normalizar_nome(nome)
         email = normalizar_email(email)
         self._senhas.validar_nova_senha(senha, confirmacao, email=email)
@@ -95,8 +105,50 @@ class AutenticacaoService:
                     "Este e-mail já está cadastrado. Entre na sua conta ou use 'Esqueci minha senha'.",
                     campo="email",
                 ) from None
-            token = self._abrir_sessao(usuario)
-        return ResultadoEntrada(usuario, token)
+            return self._mensagem_de_confirmacao(usuario)
+
+    def _mensagem_de_confirmacao(self, usuario: Usuario) -> MensagemEmail:
+        """Precisa rodar dentro de uma transação."""
+        link = self._novo_link(usuario, "confirmacao", self._validade_confirmacao,
+                               pagina="confirmar-email")
+        horas = int(self._validade_confirmacao.total_seconds() // 3600)
+        texto = (
+            f"Olá, {usuario.nome}.\n\n"
+            "Sua conta no Meu Veículo foi criada. Para confirmar que este e-mail é seu e "
+            f"liberar a entrada, abra o link abaixo. Ele vale por {horas} horas e só pode ser "
+            "usado uma vez:\n\n"
+            f"{link}\n\n"
+            "Se o link vencer, peça outro na tela Entrar.\n"
+            "Se não foi você que criou esta conta, ignore esta mensagem.\n"
+        )
+        return MensagemEmail(para=usuario.email, assunto="Meu Veículo: confirme seu e-mail",
+                             texto=texto)
+
+    def confirmar_email(self, token: str) -> None:
+        """Consome o link de confirmação e libera a conta. Não abre sessão: a
+        pessoa entra em seguida com e-mail e senha."""
+        if not token_com_formato_valido(token):
+            raise DadosInvalidos(MENSAGEM_LINK_CONFIRMACAO_INVALIDO, campo="token")
+        with self._uow.transacao():
+            usuario_id = self._recuperacoes.consumir(hash_de(token), ("confirmacao",))
+            usuario = self._usuarios.buscar_por_id(usuario_id) if usuario_id else None
+            if usuario is None or not usuario.ativo:
+                raise DadosInvalidos(MENSAGEM_LINK_CONFIRMACAO_INVALIDO, campo="token")
+            self._usuarios.confirmar_email(usuario)
+
+    def reenviar_confirmacao(self, email: str) -> MensagemEmail:
+        """Link novo de confirmação (o anterior deixa de valer)."""
+        usuario = self._usuarios.buscar_por_email(normalizar_email(email))
+        if usuario is None:
+            raise NaoEncontrado(MENSAGEM_EMAIL_INEXISTENTE, campo="email")
+        if not usuario.ativo:
+            raise AcessoNegado("Esta conta está desativada. Fale com o administrador do sistema.",
+                               campo="email")
+        if usuario.email_confirmado:
+            raise Conflito("Este e-mail já foi confirmado. Entre com seu e-mail e senha.",
+                           campo="email")
+        with self._uow.transacao():
+            return self._mensagem_de_confirmacao(usuario)
 
     # ------------------------------------------------------------------- entrada
     def entrar(self, email: str, senha: str, ip: str | None) -> ResultadoEntrada:
@@ -130,6 +182,11 @@ class AutenticacaoService:
             self._tentativas.registrar(TIPO_LOGIN, chave, ip, sucesso=True)
         if not usuario.ativo:
             raise AcessoNegado("Esta conta está desativada. Fale com o administrador do sistema.")
+        if not usuario.email_confirmado:
+            raise AcessoNegado(
+                "Confirme seu e-mail para entrar: abra o link que enviamos quando você criou a "
+                "conta (confira também o spam).",
+                campo="email", codigo="email_nao_confirmado")
 
         with self._uow.transacao():
             if self._senhas.precisa_atualizar(usuario.senha_hash):
@@ -203,7 +260,8 @@ class AutenticacaoService:
         with self._uow.transacao():
             return self.link_de_recuperacao(usuario)
 
-    def _novo_link(self, usuario: Usuario, finalidade: str, validade: timedelta) -> str:
+    def _novo_link(self, usuario: Usuario, finalidade: str, validade: timedelta,
+                   pagina: str = "redefinir-senha") -> str:
         """Cria o link (só o hash vai para o banco) e cancela os anteriores.
         Precisa rodar dentro de uma transação."""
         token = gerar_token()
@@ -211,7 +269,7 @@ class AutenticacaoService:
         self._recuperacoes.criar(usuario.id, hash_de(token), validade, finalidade)
         # O token vai depois do "#": essa parte do endereço não é enviada a
         # nenhum servidor, nem aparece em logs.
-        return f"{self._url_frontend}/redefinir-senha#token={token}"
+        return f"{self._url_frontend}/{pagina}#token={token}"
 
     def link_de_convite(self, usuario: Usuario, quem_convidou: str) -> MensagemEmail:
         """E-mail de convite para a conta criada pelo administrador. Precisa
@@ -262,12 +320,14 @@ class AutenticacaoService:
             raise DadosInvalidos(MENSAGEM_LINK_INVALIDO, campo="token")
         self._senhas.validar_nova_senha(nova_senha, confirmacao, campo="nova_senha")
         with self._uow.transacao():
-            usuario_id = self._recuperacoes.consumir(hash_de(token))
+            usuario_id = self._recuperacoes.consumir(hash_de(token), ("recuperacao", "convite"))
             usuario = self._usuarios.buscar_por_id(usuario_id) if usuario_id else None
             if usuario is None or not usuario.ativo:
                 raise DadosInvalidos(MENSAGEM_LINK_INVALIDO, campo="token")
             self._senhas.validar_nova_senha(nova_senha, confirmacao, email=usuario.email,
                                             campo="nova_senha")
             self._usuarios.atualizar_senha(usuario, self._senhas.gerar_hash(nova_senha))
+            # O link chegou no e-mail e foi aberto: o e-mail é da pessoa.
+            self._usuarios.confirmar_email(usuario)
             self._sessoes.revogar_do_usuario(usuario.id, "senha_redefinida")
             self._recuperacoes.cancelar_pendentes(usuario.id)

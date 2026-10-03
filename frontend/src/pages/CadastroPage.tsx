@@ -1,13 +1,14 @@
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
 
 import Alerta from "../components/Alerta";
 import BotaoEnviar from "../components/BotaoEnviar";
 import CampoSenha from "../components/CampoSenha";
 import CampoTexto from "../components/CampoTexto";
+import ReenvioConfirmacao from "../components/ReenvioConfirmacao";
 import TopoComVoltar from "../components/TopoComVoltar";
-import { useAuth } from "../contexts/AuthContext";
 import { useEnvioFormulario } from "../hooks/useEnvioFormulario";
+import { cadastrar } from "../services/authService";
 import {
   erroConfirmacao,
   erroEmail,
@@ -26,10 +27,10 @@ function IconeEscudo() {
   );
 }
 
-// Tela "Criar conta" (PDF, página 3).
+// Tela "Criar conta" (PDF, página 3). A conta só entra depois de confirmar o
+// e-mail pelo link enviado (migration 0014).
 export default function CadastroPage() {
-  const { cadastrar } = useAuth();
-  const navegar = useNavigate();
+  const [criada, setCriada] = useState<{ mensagem: string; email: string } | null>(null);
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
@@ -48,10 +49,31 @@ export default function CadastroPage() {
       setErrosCampo(erros);
       return;
     }
-    const deuCerto = await enviar(async () => {
-      await cadastrar({ nome, email, senha, confirmacao_senha: confirmacao });
+    await enviar(async () => {
+      const resposta = await cadastrar({ nome, email, senha, confirmacao_senha: confirmacao });
+      setCriada({ mensagem: resposta.mensagem, email });
+      setSenha("");
+      setConfirmacao("");
     });
-    if (deuCerto) navegar("/", { replace: true });
+  }
+
+  if (criada) {
+    return (
+      <div className="pagina">
+        <main className="conteudo conteudo--topo">
+          <TopoComVoltar titulo="Confirme seu e-mail" voltarPara="/entrar" estilo="grande" />
+          <Alerta tipo="sucesso">{criada.mensagem}</Alerta>
+          <p className="texto-suave">
+            Depois de abrir o link, entre com seu e-mail e senha. O link vale por 48 horas.
+          </p>
+          <Link to="/entrar" className="botao botao--primario">
+            Ir para Entrar
+          </Link>
+          <p className="texto-suave">Não chegou?</p>
+          <ReenvioConfirmacao email={criada.email} />
+        </main>
+      </div>
+    );
   }
 
   return (

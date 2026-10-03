@@ -29,8 +29,9 @@ class CaixaDeEntrada:
     def enviar(self, mensagem: MensagemEmail) -> None:
         self.mensagens.append(mensagem)
 
-    def ultimo_token(self) -> str:
-        return self.mensagens[-1].texto.split("#token=")[1].split()[0]
+    def ultimo_token(self, para: str | None = None) -> str:
+        mensagens = [m for m in self.mensagens if para is None or m.para == para]
+        return mensagens[-1].texto.split("#token=")[1].split()[0]
 
 
 def ligar_app_ao_banco(engine, caixa: CaixaDeEntrada) -> None:
@@ -44,11 +45,31 @@ def novo_aparelho() -> TestClient:
     return TestClient(app, headers=CABECALHOS_APP)
 
 
-def cadastrar(cliente: TestClient, email: str = "paula@email.com", nome: str = "Paula",
-              senha: str = SENHA_BOA, **extra):
+def so_cadastrar(cliente: TestClient, email: str = "paula@email.com", nome: str = "Paula",
+                 senha: str = SENHA_BOA, **extra):
+    """Só o POST /cadastro: a conta fica esperando a confirmação do e-mail."""
     return cliente.post("/api/auth/cadastro", json={
         "nome": nome, "email": email, "senha": senha, "confirmacao_senha": senha, **extra,
     })
+
+
+def confirmar(cliente: TestClient, token: str):
+    return cliente.post("/api/auth/confirmar-email", json={"token": token})
+
+
+def cadastrar(cliente: TestClient, email: str = "paula@email.com", nome: str = "Paula",
+              senha: str = SENHA_BOA, **extra):
+    """Conta pronta para os testes: cadastra, abre o link de confirmação que
+    chegou na caixa de entrada e entra com o mesmo cliente (o fluxo real da
+    tela). Devolve a resposta do cadastro (201 se deu certo)."""
+    resposta = so_cadastrar(cliente, email=email, nome=nome, senha=senha, **extra)
+    if resposta.status_code == 201:
+        # A caixa de entrada que o app deste cliente está usando no teste.
+        caixa = cliente.app.dependency_overrides[obter_enviador_email]()
+        token = caixa.ultimo_token(para=email.strip().lower())
+        assert confirmar(cliente, token).status_code == 200
+        assert entrar(cliente, email=email, senha=senha).status_code == 200
+    return resposta
 
 
 def entrar(cliente: TestClient, email: str = "paula@email.com", senha: str = SENHA_BOA):

@@ -11,7 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from app.schemas.erro_schema import ErroResposta
+from app.schemas.erro_schema import ErroComCodigo, ErroResposta
 from app.services.erros import (
     AcessoNegado,
     Conflito,
@@ -65,10 +65,9 @@ def codigo_http(erro: ErroDeNegocio) -> int:
 
 async def tratar_erro_de_negocio(_requisicao: Request, erro: Exception) -> JSONResponse:
     assert isinstance(erro, ErroDeNegocio)
-    corpo = ErroResposta(
-        mensagem=erro.mensagem,
-        campos={erro.campo: erro.mensagem} if erro.campo else None,
-    )
+    campos = {erro.campo: erro.mensagem} if erro.campo else None
+    corpo = (ErroComCodigo(mensagem=erro.mensagem, campos=campos, codigo=erro.codigo)
+             if erro.codigo else ErroResposta(mensagem=erro.mensagem, campos=campos))
     return JSONResponse(status_code=codigo_http(erro), content=corpo.model_dump())
 
 
