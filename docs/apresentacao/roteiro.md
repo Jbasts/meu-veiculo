@@ -11,6 +11,9 @@ partir do dia da carga, alguns números mudam um pouco (dias até a revisão,
 nível estimado do tanque). **Ensaie pelo menos uma vez com a carga feita no
 dia** para conferir os valores que vai falar.
 
+Os valores citados abaixo foram conferidos no navegador em 03/10/2026, com a
+carga de exemplo feita nesse dia (num banco de teste).
+
 ---
 
 ## 1. Preparação
@@ -86,7 +89,9 @@ Senha das duas: `meu veiculo de exemplo` (não é segredo; está no código da c
 
 1. Entre com `paula@exemplo.com.br`.
 2. Na tela **Início**, mostre de cima para baixo:
-   - os **gastos do mês** em três grupos (Manutenção, Combustível, Outros);
+   - os **gastos do mês**, em até três grupos (Manutenção, Combustível,
+     Outros). Só aparecem os grupos que tiveram gasto: no começo do mês (no
+     ensaio de 03/10, só "Outros", R$ 63,00), fale do grupo que estiver lá;
    - **Precisa de atenção**: revisão próxima, rodízio de pneus perto do km,
      problema aberto e conta vencida;
    - **Próximos gastos** (IPVA do ano que vem e renovação do seguro);
@@ -101,17 +106,27 @@ Senha das duas: `meu veiculo de exemplo` (não é segredo; está no código da c
 1. Toque em **Finanças** → aba **Combustível**.
 2. Mostre o **consumo por mês**, as **marcações do tanque** e a lista de
    **abastecimentos** (gasolina e etanol).
-3. Mostre o cartão **Etanol ou gasolina?**: digite o preço de hoje dos dois e
-   veja a recomendação. Fala: *"O limite não é o 70% fixo da internet: é
-   calculado com o consumo real deste carro com cada combustível."*
+3. Mostre o cartão **Etanol ou gasolina?**: toque em **Simular com os preços
+   de hoje**, digite os dois preços e veja a recomendação. Fala: *"O limite
+   vem do consumo real deste carro: 8,5 km/L com etanol dividido por 12,1 com
+   gasolina dá 70%. Num carro que rende diferente, o limite muda."* (Com os
+   dados de exemplo o limite coincide com os 70% da regra popular; vale dizer
+   isso antes que alguém da banca pergunte.)
+   Na lista **Marcações do tanque**, a marcação de 01/10 mostra um consumo
+   estimado baixo (≈ 4,6 km/L) porque o trecho é de um dia só e a margem do
+   marcador pesa muito: não precisa parar nela.
 4. Registre um abastecimento ao vivo pelo atalho **Abastecer** do Início:
    informe dois dos três valores (litros, preço, total) e mostre que o
    sistema calcula o terceiro e confere o limite do tanque.
 
 ### Bloco 4 — Manutenção (2 min)
 
-1. Toque em **Manutenção** → aba **Pendentes**: atrasadas, próximas e
-   "dados insuficientes", cada obrigação aparecendo uma vez só.
+1. Toque em **Manutenção** → aba **Pendentes**: **Próximas** (revisão dos
+   90 mil km agendada, em 18 dias; rodízio de pneus a 780 km) e **Em dia**
+   (correia dentada, troca de óleo). Cada obrigação aparece uma vez só. Fala:
+   *"Se uma passar do prazo, ela sobe para Atrasadas; sem dados para calcular,
+   aparece em Dados insuficientes."* (Os dados de exemplo não têm nenhuma
+   atrasada.)
 2. Aba **Planos**: troca de óleo, rodízio de pneus e correia dentada, por km,
    por meses ou pelos dois.
 3. Aba **Realizadas**: abra a troca de óleo e mostre peças e mão de obra
@@ -140,8 +155,9 @@ Senha das duas: `meu veiculo de exemplo` (não é segredo; está no código da c
    orçamento** (R$ 450,00 de R$ 400,00) e "Rodas aro 17" planejado.
 2. Abra o "Som novo" e mostre as fotos de **antes e depois** (painel com o
    rádio original → central multimídia instalada) e os gastos dele.
-3. **Mais** → **Meu veículo**: custo total do carro por grupo (aquisição,
-   combustível, manutenção, projetos, seguro, documentação).
+3. **Mais** → **Meu veículo**: "Quanto esse carro já me custou" (no ensaio,
+   R$ 77.030,01) por grupo (aquisição, combustível, manutenções, projetos,
+   seguro, documentação, outros) e o custo por quilômetro.
 
 ### Bloco 8 — Histórico e administração *(opcional, 1 min)*
 
@@ -156,8 +172,9 @@ Senha das duas: `meu veiculo de exemplo` (não é segredo; está no código da c
 2. Entre com `rafael@exemplo.com.br`: ele só vê o Fiat Argo dele.
 3. Fala: *"A permissão é conferida no servidor em toda leitura e gravação.
    Mesmo trocando o número do veículo no endereço, a resposta é 'não
-   encontrado'."* Se quiser provar, troque o número do veículo na barra de
-   endereço.
+   encontrado'."* Para provar: logado como Rafael, digite no endereço
+   `/veiculos/2` (o Civic da Paula nos dados de exemplo) e mostre
+   "Veículo não encontrado."
 
 ### Bloco 10 — Celular *(opcional, 1 min)*
 
@@ -190,6 +207,10 @@ da demonstração gravado no ensaio (caso o computador falhe).
 ---
 
 ## 4. Perguntas prováveis da banca
+
+As principais estão abaixo. A lista completa, por assunto (57 perguntas
+com respostas sugeridas), está em
+`docs/apresentacao/perguntas-da-banca.md`.
 
 **Por que aplicativo web instalável (PWA) e não um app nativo?**
 Um só código para computador e celular, sem loja de aplicativos e sem

@@ -1756,10 +1756,9 @@ próprio, `meu_veiculo_demo` (`DB_NOME_DEMO`), e nunca no de desenvolvimento
 dados de exemplo, e o sistema continua funcionando com banco vazio.
 
 Roteiro da demonstração (passo a passo, falas, plano B e perguntas
-prováveis da banca): `docspresentacao
-oteiro.md`. Resumo técnico para o
-texto do TCC: `docspresentacao
-esumo-para-o-tcc.md`.
+prováveis da banca): `docs\apresentacao\roteiro.md`. Resumo técnico para o
+texto do TCC: `docs\apresentacao\resumo-para-o-tcc.md`. Perguntas que a banca
+pode fazer, com respostas sugeridas: `docs\apresentacao\perguntas-da-banca.md`.
 
 ### 20.1 O que é criado
 
